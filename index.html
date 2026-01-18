@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#4f46e5">
-    <title>Nexus ERP v9.4 - Platinum</title>
+    <title>Nexus ERP v9.5 - Diamond</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -29,10 +29,10 @@
 
         /* Cards & UI */
         .card-custom { border: none; border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); overflow: hidden; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); cursor: default; }
-        .card-active { cursor: pointer; }
-        .card-active:hover { transform: translateY(-5px) scale(1.01); box-shadow: 0 20px 30px -10px rgba(79, 70, 229, 0.15); }
-        
+        .card-active:hover { transform: translateY(-5px) scale(1.01); box-shadow: 0 20px 30px -10px rgba(79, 70, 229, 0.15); cursor: pointer; }
         .icon-box { width: 45px; height: 45px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        
+        /* Cores */
         .bg-green-soft { background-color: #d1fae5; color: #065f46; }
         .bg-red-soft { background-color: #fee2e2; color: #991b1b; }
         .bg-blue-soft { background-color: #dbeafe; color: #1e40af; }
@@ -63,27 +63,33 @@
         .pdv-product-card:hover { border-color: #6366f1; background-color: #f5f3ff; }
         .cart-area { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); height: calc(100vh - 40px); display: flex; flex-direction: column; position: sticky; top: 20px; }
         @media (max-width: 768px) { .cart-area { height: auto; min-height: 400px; position: relative; top: 0; margin-top: 20px; } }
-        
         .qty-input { width: 40px; text-align: center; border: 1px solid #dee2e6; border-radius: 6px; margin: 0 5px; padding: 2px; font-weight: bold; font-size: 0.9rem; }
         .qty-input:focus { outline: none; border-color: #4f46e5; }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-        /* Impressão */
-        @media print { body * { visibility: hidden; } #cupom-fiscal, #cupom-fiscal * { visibility: visible; } #cupom-fiscal { position: absolute; left: 0; top: 0; width: 100%; } }
+        /* Botões de Pagamento (Visual Bonito) */
+        .btn-pagamento { border: 2px solid #e5e7eb; border-radius: 15px; padding: 15px; transition: all 0.2s; text-align: center; background: white; width: 100%; height: 100%; }
+        .btn-pagamento:hover { background-color: #f9fafb; transform: translateY(-2px); }
+        .btn-pagamento.active { border-color: #4f46e5; background-color: #eef2ff; color: #4f46e5; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2); }
+        .btn-pagamento i { font-size: 1.8rem; margin-bottom: 8px; display: block; }
+
+        /* Impressão CORRETA */
+        @media print {
+            body * { visibility: hidden; }
+            #area-impressao, #area-impressao * { visibility: visible; }
+            #area-impressao { position: absolute; left: 0; top: 0; width: 100%; background: white; padding: 20px; }
+            .no-print { display: none !important; }
+        }
     </style>
 </head>
 <body>
 
-<div id="global-loader" class="hide">
-    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div>
-</div>
+<div id="global-loader" class="hide"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div></div>
 
 <div id="login-screen">
     <div class="login-box fade-in">
         <div class="mb-4">
-            <div class="bg-primary bg-opacity-10 d-inline-block p-3 rounded-circle mb-3">
-                <i class="fas fa-layer-group fa-3x text-primary"></i>
-            </div>
+            <div class="bg-primary bg-opacity-10 d-inline-block p-3 rounded-circle mb-3"><i class="fas fa-layer-group fa-3x text-primary"></i></div>
             <h2 class="fw-bold">NEXUS CLOUD</h2>
             <p class="text-muted small">Gestão segura & Individual</p>
         </div>
@@ -96,6 +102,8 @@
         <small class="text-muted mt-3 d-block" id="status-login"></small>
     </div>
 </div>
+
+<div id="area-impressao" class="hide"></div>
 
 <div class="overlay" id="overlay" onclick="toggleMenu()"></div>
 <div class="mobile-header shadow-sm">
@@ -185,10 +193,10 @@
                 <div class="card card-custom p-4">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h6 class="fw-bold m-0"><i class="fas fa-list-ul me-2"></i>Extrato Detalhado</h6>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="fas fa-print me-2"></i>Imprimir</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="imprimirExtrato()"><i class="fas fa-print me-2"></i>Imprimir Relatório</button>
                     </div>
                     <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                        <table class="table table-hover align-middle mb-0"><thead class="bg-light small text-uppercase text-muted"><tr><th>Data</th><th>Descrição (Itens)</th><th>Tipo</th><th class="text-end">Valor</th></tr></thead><tbody id="rel-detalhes"></tbody></table>
+                        <table class="table table-hover align-middle mb-0" id="tabela-extrato"><thead class="bg-light small text-uppercase text-muted"><tr><th>Data</th><th>Descrição (Itens)</th><th>Tipo</th><th class="text-end">Valor</th></tr></thead><tbody id="rel-detalhes"></tbody></table>
                     </div>
                 </div>
             </div>
@@ -236,23 +244,59 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalPagamento" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4 text-center"><h1 class="fw-bold mb-4" id="modal-pag-total">R$ 0,00</h1><select id="pag-metodo" class="form-select form-select-lg mb-3 bg-light border-0"><option>Dinheiro</option><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option></select><button class="btn btn-success w-100 btn-lg rounded-pill fw-bold" onclick="processarVenda(this)">CONFIRMAR</button></div></div></div></div>
-<div class="modal fade" id="modalProduto" tabindex="-1"><div class="modal-dialog"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4"><input type="hidden" id="prod-id"><h5 class="fw-bold mb-3">Produto</h5><input type="text" id="prod-nome" class="form-control mb-3 bg-light border-0" placeholder="Nome do Produto"><div class="row g-2"><div class="col-6"><input type="number" id="prod-qtd" class="form-control bg-light border-0" placeholder="Qtd"></div><div class="col-6"><input type="number" id="prod-min" class="form-control bg-light border-0" placeholder="Min" value="5"></div><div class="col-6"><input type="number" id="prod-custo" class="form-control bg-light border-0" placeholder="Custo R$"></div><div class="col-6"><input type="number" id="prod-venda" class="form-control bg-light border-0" placeholder="Venda R$"></div></div><button class="btn btn-primary w-100 mt-4 rounded-pill fw-bold" onclick="salvarProduto(this)">SALVAR</button></div></div></div></div>
-<div class="modal fade" id="modalFinanca" tabindex="-1"><div class="modal-dialog modal-sm"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4"><h5 class="fw-bold mb-3">Lançamento</h5><input type="text" id="fin-desc" class="form-control mb-2 bg-light border-0" placeholder="Descrição (Ex: Mouse Gamer)"><select id="fin-tipo" class="form-select mb-2 bg-light border-0"><option value="entrada">Entrada</option><option value="saida">Saída</option></select><input type="number" id="fin-valor" class="form-control mb-3 bg-light border-0" placeholder="Valor"><button class="btn btn-success w-100 rounded-pill fw-bold" onclick="salvarFinanca(this)">SALVAR</button></div></div></div></div>
-<div class="modal fade" id="modalOS" tabindex="-1"><div class="modal-dialog"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4"><h5 class="fw-bold mb-3">Nova O.S.</h5><input type="text" id="os-cliente" class="form-control mb-2 bg-light border-0" placeholder="Nome do Cliente"><textarea id="os-desc" class="form-control mb-2 bg-light border-0" placeholder="Descrição do Serviço" rows="3"></textarea><div class="row g-2"><div class="col-6"><input type="number" id="os-valor" class="form-control bg-light border-0" placeholder="Valor"></div><div class="col-6"><input type="date" id="os-data" class="form-control bg-light border-0"></div></div><button class="btn btn-primary w-100 mt-4 rounded-pill fw-bold" onclick="salvarOS(this)">CRIAR O.S.</button></div></div></div></div>
+<div class="modal fade" id="modalPagamento" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="fw-bold">Finalizar Venda</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <small class="text-muted text-uppercase">Total a Pagar</small>
+                    <h1 class="fw-bold display-4 text-primary" id="modal-pag-total">R$ 0,00</h1>
+                </div>
+                
+                <p class="fw-bold mb-3 text-muted small">SELECIONE O MÉTODO:</p>
+                <input type="hidden" id="pag-metodo" value="">
+                
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        <div class="btn-pagamento" onclick="selectPagamento('Dinheiro', this)">
+                            <i class="fas fa-money-bill-wave text-success"></i>
+                            <span class="fw-bold small">Dinheiro</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="btn-pagamento" onclick="selectPagamento('PIX', this)">
+                            <i class="fas fa-qrcode text-info"></i> <span class="fw-bold small">PIX</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="btn-pagamento" onclick="selectPagamento('Débito', this)">
+                            <i class="fas fa-credit-card text-primary"></i>
+                            <span class="fw-bold small">Débito</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="btn-pagamento" onclick="selectPagamento('Crédito', this)">
+                            <i class="far fa-credit-card text-warning"></i>
+                            <span class="fw-bold small">Crédito</span>
+                        </div>
+                    </div>
+                </div>
 
-<div id="cupom-fiscal" class="hide p-4 bg-white text-black" style="width: 300px; font-family: 'Courier New', monospace;">
-    <div class="text-center mb-3">
-        <h4 class="fw-bold" id="cp-nome">NEXUS ERP</h4>
-        <small id="cp-dados">CNPJ: ...</small>
-        <hr style="border-top: 2px dashed black;">
+                <button class="btn btn-success w-100 btn-lg rounded-pill fw-bold shadow py-3" onclick="processarVenda(this)">
+                    <i class="fas fa-check me-2"></i> CONFIRMAR VENDA
+                </button>
+            </div>
+        </div>
     </div>
-    <div id="cupom-titulo" class="text-center fw-bold mb-2">COMPROVANTE DE VENDA</div>
-    <div id="cupom-itens" class="mb-3"></div>
-    <hr style="border-top: 2px dashed black;">
-    <div class="d-flex justify-content-between fw-bold fs-5"><span>TOTAL:</span><span id="cupom-total"></span></div>
-    <div class="mt-4 text-center"><p class="mb-1">Pgto: <span id="cupom-pagamento"></span></p><small id="cp-msg">Volte Sempre!</small></div>
 </div>
+
+<div class="modal fade" id="modalProduto" tabindex="-1"><div class="modal-dialog"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4"><input type="hidden" id="prod-id"><h5 class="fw-bold mb-3">Produto</h5><input type="text" id="prod-nome" class="form-control mb-3 bg-light border-0" placeholder="Nome do Produto"><div class="row g-2"><div class="col-6"><input type="number" id="prod-qtd" class="form-control bg-light border-0" placeholder="Qtd"></div><div class="col-6"><input type="number" id="prod-min" class="form-control bg-light border-0" placeholder="Min" value="5"></div><div class="col-6"><input type="number" id="prod-custo" class="form-control bg-light border-0" placeholder="Custo R$"></div><div class="col-6"><input type="number" id="prod-venda" class="form-control bg-light border-0" placeholder="Venda R$"></div></div><button class="btn btn-primary w-100 mt-4 rounded-pill fw-bold" onclick="salvarProduto(this)">SALVAR</button></div></div></div></div>
+<div class="modal fade" id="modalFinanca" tabindex="-1"><div class="modal-dialog modal-sm"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4"><h5 class="fw-bold mb-3">Lançamento</h5><input type="text" id="fin-desc" class="form-control mb-2 bg-light border-0" placeholder="Descrição"><select id="fin-tipo" class="form-select mb-2 bg-light border-0"><option value="entrada">Entrada</option><option value="saida">Saída</option></select><input type="number" id="fin-valor" class="form-control mb-3 bg-light border-0" placeholder="Valor"><button class="btn btn-success w-100 rounded-pill fw-bold" onclick="salvarFinanca(this)">SALVAR</button></div></div></div></div>
+<div class="modal fade" id="modalOS" tabindex="-1"><div class="modal-dialog"><div class="modal-content border-0 rounded-4"><div class="modal-body p-4"><h5 class="fw-bold mb-3">Nova O.S.</h5><input type="text" id="os-cliente" class="form-control mb-2 bg-light border-0" placeholder="Nome do Cliente"><textarea id="os-desc" class="form-control mb-2 bg-light border-0" placeholder="Descrição do Serviço" rows="3"></textarea><div class="row g-2"><div class="col-6"><input type="number" id="os-valor" class="form-control bg-light border-0" placeholder="Valor"></div><div class="col-6"><input type="date" id="os-data" class="form-control bg-light border-0"></div></div><button class="btn btn-primary w-100 mt-4 rounded-pill fw-bold" onclick="salvarOS(this)">CRIAR O.S.</button></div></div></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -302,7 +346,7 @@
         getConfigRef().onSnapshot(s => { if(s.exists) { configEmpresa = s.data(); carregarConfigUI(); } });
     }
 
-    // DASHBOARD (COM BOTÃO DELETAR X)
+    // DASHBOARD
     function atualizarDashboard() {
         let ent=0, sai=0;
         const mesAtual = new Date().getMonth();
@@ -363,6 +407,23 @@
         });
     }
 
+    function imprimirExtrato() {
+        // Pega o conteúdo da tabela
+        const tabela = document.getElementById('tabela-extrato').outerHTML;
+        const html = `
+            <div style="text-align:center; margin-bottom:20px;">
+                <h3>${configEmpresa.nome || 'NEXUS ERP'}</h3>
+                <p>Relatório Detalhado de Movimentações</p>
+                <hr>
+            </div>
+            ${tabela}
+            <div style="margin-top:20px; text-align:right; font-weight:bold;">
+                Emitido em: ${new Date().toLocaleString()}
+            </div>
+        `;
+        imprimirConteudo(html);
+    }
+
     function navTo(id) { document.querySelectorAll('.section').forEach(el=>el.classList.add('hide')); document.getElementById(id).classList.remove('hide'); toggleMenu(true); if(id==='dashboard') atualizarDashboard(); if(id==='estoque') renderEstoque(false); }
     function toggleMenu(force){ const sb=document.getElementById('sidebar'), ov=document.getElementById('overlay'); if(force){sb.classList.remove('show');ov.classList.remove('show')}else{sb.classList.toggle('show');ov.classList.toggle('show')} }
 
@@ -376,6 +437,7 @@
         }) 
     }
 
+    // PDV LOGIC
     function renderPDVGrid(){ const c=document.getElementById('pdv-grid'); c.innerHTML=''; const s=document.getElementById('pdv-search').value.toLowerCase(); produtos.forEach(p=>{ if(p.nome.toLowerCase().includes(s)) c.innerHTML+=`<div class="col-6 col-lg-4"><div class="card p-3 pdv-product-card h-100" onclick="addCart('${p.id}')"><div class="d-flex justify-content-between mb-2"><span class="badge bg-light text-secondary border">Est: ${p.qtd}</span></div><div class="fw-bold mb-1 text-truncate">${p.nome}</div><div class="h5 text-primary fw-bold">${formatCurrency(p.venda)}</div></div></div>` }); }
     function addCart(id){ const p=produtos.find(x=>x.id===id), i=carrinho.find(c=>c.id===id); if(p.qtd<=(i?i.qty:0)) return Swal.fire({toast:true,icon:'error',title:'Estoque insuficiente',timer:1000,showConfirmButton:false}); i?i.qty++:carrinho.push({...p,qty:1}); renderCart(); }
     function updateCartQty(id,d){ const i=carrinho.find(c=>c.id===id), p=produtos.find(x=>x.id===id); if(!i)return; const n=i.qty+d; if(n>p.qtd)return Swal.fire({toast:true,icon:'warning',title:'Máximo atingido',timer:1000,showConfirmButton:false}); if(n<=0)carrinho=carrinho.filter(c=>c.id!==id); else i.qty=n; renderCart(); }
@@ -391,13 +453,21 @@
     function limparCarrinho(){ carrinho=[]; renderCart(); }
     function abrirModalPagamento(){ if(carrinho.length) new bootstrap.Modal(document.getElementById('modalPagamento')).show(); }
     
-    // PROCESSAR VENDA (Atualizado com PERGUNTA DE IMPRESSÃO e DETALHE DO ITEM)
+    // SELEÇÃO DE PAGAMENTO (NOVA)
+    function selectPagamento(tipo, elem) {
+        document.getElementById('pag-metodo').value = tipo;
+        document.querySelectorAll('.btn-pagamento').forEach(b => b.classList.remove('active'));
+        elem.classList.add('active');
+    }
+
     async function processarVenda(btn){
-        setLoading(btn,true); const met=document.getElementById('pag-metodo').value; const batch=db.batch(); let sub=0, cupom='';
+        const met=document.getElementById('pag-metodo').value;
+        if(!met) return Swal.fire('Atenção', 'Selecione uma forma de pagamento!', 'warning');
+
+        setLoading(btn,true); const batch=db.batch(); let sub=0, cupom='';
         
         if(!currentUser) { alert('Sessão expirada.'); location.reload(); return; }
 
-        // Cria descrição detalhada (Ex: 2x Mouse, 1x Teclado)
         let itensDesc = carrinho.map(i => `${i.qty}x ${i.nome}`).join(', ');
 
         carrinho.forEach(i=>{ 
@@ -412,22 +482,25 @@
         await batch.commit();
         const tot = Math.max(0, sub - (parseFloat(document.getElementById('pdv-desconto').value)||0));
         
-        // Salva com a descrição detalhada
         await addData("financas", {tipo:'entrada',desc:itensDesc,metodo:met,valor:tot,dataISO:new Date().toISOString()}, null);
-        await log('Venda', itensDesc, tot); // Salva no histórico também
+        await log('Venda', itensDesc, tot);
         
         setLoading(btn,false); 
         bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
 
-        // Configura Cupom
-        document.getElementById('cp-nome').innerText = configEmpresa.nome || 'NEXUS ERP';
-        document.getElementById('cp-dados').innerHTML = `${configEmpresa.cnpj||''}<br>${configEmpresa.end||''}`;
-        document.getElementById('cp-titulo').innerText = 'COMPROVANTE DE VENDA';
-        document.getElementById('cupom-itens').innerHTML = cupom;
-        document.getElementById('cupom-total').innerText = formatCurrency(tot);
-        document.getElementById('cupom-pagamento').innerText = met;
+        // Prepara Cupom
+        const cupomHTML = `
+            <div class="text-center mb-3">
+                <h4 class="fw-bold">${configEmpresa.nome || 'NEXUS ERP'}</h4>
+                <small>${configEmpresa.cnpj||''}<br>${configEmpresa.end||''}</small>
+                <hr style="border-top: 2px dashed black;">
+            </div>
+            <div class="mb-3">${cupom}</div>
+            <hr style="border-top: 2px dashed black;">
+            <div class="d-flex justify-content-between fw-bold fs-5"><span>TOTAL:</span><span>${formatCurrency(tot)}</span></div>
+            <div class="mt-4 text-center"><p class="mb-1">Pgto: ${met}</p><small>${configEmpresa.msg || 'Volte Sempre!'}</small></div>
+        `;
 
-        // Pergunta se quer imprimir
         Swal.fire({
             title: 'Venda Sucesso!',
             text: 'Deseja imprimir o comprovante?',
@@ -436,12 +509,21 @@
             confirmButtonText: 'Sim, Imprimir',
             cancelButtonText: 'Não'
         }).then((result) => {
-            if (result.isConfirmed) window.print();
+            if (result.isConfirmed) imprimirConteudo(cupomHTML);
             limparCarrinho();
         });
     }
 
-    // OS - CONCLUIR E IMPRIMIR
+    // IMPRESSÃO UNIVERSAL (Correção Folha Branca)
+    function imprimirConteudo(html) {
+        const area = document.getElementById('area-impressao');
+        area.innerHTML = html;
+        area.classList.remove('hide');
+        window.print();
+        setTimeout(() => area.classList.add('hide'), 500);
+    }
+
+    // OS
     function abrirModalOS(){ new bootstrap.Modal(document.getElementById('modalOS')).show(); }
     function salvarOS(btn){ addData("os",{cliente:document.getElementById('os-cliente').value,desc:document.getElementById('os-desc').value,valor:parseFloat(document.getElementById('os-valor').value)||0,prazo:document.getElementById('os-data').value,dataCriacao:new Date().toISOString(),concluido:false},btn); }
     
@@ -473,13 +555,22 @@
 
     function imprimirOS(id) {
         const o = osList.find(i => i.id === id);
-        document.getElementById('cp-nome').innerText = configEmpresa.nome || 'NEXUS ERP';
-        document.getElementById('cp-dados').innerHTML = "ORDEM DE SERVIÇO";
-        document.getElementById('cp-titulo').innerText = o.cliente;
-        document.getElementById('cupom-itens').innerHTML = `<p>${o.desc}</p><p>Prazo: ${formatDate(o.prazo)}</p>`;
-        document.getElementById('cupom-total').innerText = formatCurrency(o.valor);
-        document.getElementById('cupom-pagamento').innerText = o.concluido ? "PAGO" : "PENDENTE";
-        window.print();
+        const html = `
+            <div class="text-center mb-3">
+                <h4 class="fw-bold">${configEmpresa.nome || 'NEXUS ERP'}</h4>
+                <small>ORDEM DE SERVIÇO</small>
+                <hr style="border-top: 2px dashed black;">
+            </div>
+            <div class="mb-3">
+                <p><strong>Cliente:</strong> ${o.cliente}</p>
+                <p><strong>Serviço:</strong> ${o.desc}</p>
+                <p><strong>Prazo:</strong> ${formatDate(o.prazo)}</p>
+            </div>
+            <hr style="border-top: 2px dashed black;">
+            <div class="d-flex justify-content-between fw-bold fs-5"><span>TOTAL:</span><span>${formatCurrency(o.valor)}</span></div>
+            <div class="mt-4 text-center"><p class="mb-1">Status: ${o.concluido ? "PAGO" : "PENDENTE"}</p></div>
+        `;
+        imprimirConteudo(html);
     }
 
     // UTILS CRUD
