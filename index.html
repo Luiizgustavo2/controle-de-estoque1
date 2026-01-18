@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus ERP v7.0 Cloud</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        :root { 
+            --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            --bg-body: #f3f4f6; --surface: #ffffff;
+            --text-main: #1f2937; --success: #10b981; --danger: #ef4444;
+            --radius: 16px; --shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg-body); overflow-x: hidden; }
+        
+        /* Sidebar & Layout */
+        .sidebar { min-height: 100vh; background: var(--primary-gradient); color: white; transition: 0.3s; z-index: 1000; }
+        .nav-link { color: rgba(255,255,255,0.7); margin: 8px 15px; border-radius: 12px; transition: 0.3s; cursor: pointer; padding: 14px 20px; display: flex; align-items: center; }
+        .nav-link:hover, .nav-link.active { background: rgba(255,255,255,0.2); color: white; font-weight: 600; transform: translateX(5px); }
+        .card-custom { border: none; border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+        
+        /* Mobile */
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; top: 0; left: -280px; height: 100vh; width: 260px; }
+            .sidebar.show { left: 0; }
+            .mobile-header { display: flex !important; justify-content: space-between; padding: 15px 20px; background: var(--primary-gradient); color: white; }
+            .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; backdrop-filter: blur(3px); }
+            .overlay.show { display: block; }
+            main { padding-top: 20px !important; }
+        }
+        .mobile-header { display: none; }
+        
+        /* Login Screen */
+        #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-body); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .login-box { background: white; padding: 40px; border-radius: 20px; box-shadow: var(--shadow); width: 100%; max-width: 400px; text-align: center; }
+
+        /* Utils */
+        .hide { display: none !important; }
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .progress-stacked { height: 25px; border-radius: 12px; overflow: hidden; background: #e5e7eb; }
+        
+        /* PDV */
+        .pdv-product-card { cursor: pointer; transition: 0.2s; border: 1px solid #e5e7eb; border-radius: 12px; }
+        .pdv-product-card:hover { border-color: #6366f1; background-color: #eef2ff; transform: scale(1.02); }
+        .cart-area { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); height: calc(100vh - 40px); display: flex; flex-direction: column; position: sticky; top: 20px; }
+        @media (max-width: 768px) { .cart-area { height: auto; min-height: 400px; position: relative; top: 0; margin-top: 20px; } }
+        .cart-items { flex-grow: 1; overflow-y: auto; }
+        
+        /* Impressão */
+        @media print { body * { visibility: hidden; } #cupom-fiscal, #cupom-fiscal * { visibility: visible; } #cupom-fiscal { position: absolute; left: 0; top: 0; width: 100%; } }
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="login-box fade-in">
+        <div class="mb-4">
+            <i class="fas fa-layer-group fa-3x text-primary mb-3"></i>
+            <h2 class="fw-bold">NEXUS CLOUD</h2>
+            <p class="text-muted">Faça login para acessar seus dados.</p>
+        </div>
+        <input type="email" id="email" class="form-control form-control-lg mb-3" placeholder="Seu E-mail">
+        <input type="password" id="password" class="form-control form-control-lg mb-3" placeholder="Sua Senha">
+        <div class="d-grid gap-2">
+            <button class="btn btn-primary btn-lg fw-bold" onclick="fazerLogin()">ENTRAR</button>
+            <button class="btn btn-success btn-lg fw-bold" onclick="criarConta()">CRIAR CONTA</button>
+        </div>
+    </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="window.toggleMenu()"></div>
+
+<div class="mobile-header shadow-sm">
+    <div class="fw-bold fs-4"><i class="fas fa-layer-group me-2"></i>NEXUS</div>
+    <button class="btn btn-outline-light border-0" onclick="window.toggleMenu()">
+        <i class="fas fa-bars fa-2x"></i>
+    </button>
+</div>
+
+<div class="container-fluid" id="app-content" style="filter: blur(5px);">
+    <div class="row">
+        <nav class="col-md-2 sidebar" id="sidebar">
+            <div class="text-center py-4 text-uppercase fw-bold fs-4" style="letter-spacing: -1px;">
+                <i class="fas fa-cloud me-2"></i> NEXUS
+            </div>
+            <div class="px-3 mb-3 text-center">
+                <small class="text-white-50" id="user-display">Carregando...</small>
+            </div>
+            <ul class="nav flex-column gap-2 px-2">
+                <li class="nav-item"><a class="nav-link active" onclick="window.navTo('dashboard'); window.toggleMenu(true)"><i class="fas fa-home me-2"></i> Visão Geral</a></li>
+                <li class="nav-item"><a class="nav-link" onclick="window.navTo('relatorios'); window.toggleMenu(true)"><i class="fas fa-chart-pie me-2"></i> Relatórios</a></li>
+                <li class="nav-item"><a class="nav-link" onclick="window.navTo('pdv'); window.toggleMenu(true)"><i class="fas fa-cash-register me-2"></i> PDV (Vendas)</a></li>
+                <li class="nav-item"><a class="nav-link" onclick="window.navTo('estoque'); window.toggleMenu(true)"><i class="fas fa-boxes me-2"></i> Estoque</a></li>
+                <li class="nav-item"><a class="nav-link" onclick="window.navTo('financeiro'); window.toggleMenu(true)"><i class="fas fa-wallet me-2"></i> Financeiro</a></li>
+                <li class="nav-item"><a class="nav-link" onclick="window.navTo('os'); window.toggleMenu(true)"><i class="fas fa-tools me-2"></i> Ordens de Serviço</a></li>
+                <li class="nav-item"><a class="nav-link special-btn text-warning" href="https://www.sebrae.com.br/sites/PortalSebrae/emissornfe" target="_blank"><i class="fas fa-file-invoice-dollar me-2"></i> Emitir NF-e</a></li>
+                <li class="nav-item mt-4"><a class="nav-link text-danger" onclick="fazerLogout()"><i class="fas fa-sign-out-alt me-2"></i> Sair</a></li>
+            </ul>
+        </nav>
+
+        <main class="col-md-10 ms-sm-auto px-4 pt-4 pb-5">
+            
+            <div id="dashboard" class="section fade-in">
+                <h2 class="fw-bold text-dark mb-4">Visão Geral</h2>
+                <div class="row g-4 mb-4">
+                    <div class="col-6 col-md-3"><div class="card card-custom p-4 border-bottom border-4 border-success"><small class="text-muted fw-bold">ENTRADAS</small><h3 id="dash-entradas" class="fw-bold mt-2 text-dark">R$ 0,00</h3></div></div>
+                    <div class="col-6 col-md-3"><div class="card card-custom p-4 border-bottom border-4 border-danger"><small class="text-muted fw-bold">SAÍDAS</small><h3 id="dash-saidas" class="fw-bold mt-2 text-dark">R$ 0,00</h3></div></div>
+                    <div class="col-6 col-md-3"><div class="card card-custom p-4 border-bottom border-4 border-primary"><small class="text-muted fw-bold">SALDO</small><h3 id="dash-saldo" class="fw-bold mt-2 text-dark">R$ 0,00</h3></div></div>
+                    <div class="col-6 col-md-3"><div class="card card-custom p-4 border-bottom border-4 border-warning"><small class="text-muted fw-bold">CRÍTICO</small><h3 id="dash-estoque-baixo" class="fw-bold mt-2 text-dark">0</h3></div></div>
+                </div>
+                <div class="card card-custom p-4">
+                    <h5 class="fw-bold mb-3">Últimas Movimentações</h5>
+                    <div class="table-responsive"><table class="table table-hover align-middle"><tbody id="dash-ultimas-movimentacoes"></tbody></table></div>
+                </div>
+            </div>
+
+            <div id="relatorios" class="section hide">
+                <h2 class="fw-bold text-dark mb-4">Relatórios</h2>
+                <div class="row g-4 mb-4">
+                    <div class="col-md-6">
+                        <div class="card card-custom p-4 h-100">
+                            <h5>Lucratividade</h5>
+                            <h2 class="fw-bold display-5" id="rel-margem">0%</h2>
+                            <div class="progress-stacked mt-3"><div class="progress" id="bar-receita" style="width:0%"><div class="progress-bar bg-success"></div></div><div class="progress" id="bar-despesa" style="width:0%"><div class="progress-bar bg-danger"></div></div></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card card-custom p-4 h-100">
+                            <h5>Resumo Financeiro</h5>
+                            <ul class="list-group list-group-flush mt-3">
+                                <li class="list-group-item d-flex justify-content-between text-success"><span>Entradas</span><strong id="rel-total-entradas">R$ 0,00</strong></li>
+                                <li class="list-group-item d-flex justify-content-between text-danger"><span>Saídas</span><strong id="rel-total-saidas">R$ 0,00</strong></li>
+                                <li class="list-group-item d-flex justify-content-between bg-light fw-bold"><span>Resultado</span><span id="rel-resultado">R$ 0,00</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="pdv" class="section hide">
+                <div class="row g-0">
+                    <div class="col-md-8 pe-md-3 mb-4">
+                        <div class="d-flex justify-content-between mb-3"><h3 class="fw-bold">PDV</h3><input type="text" id="pdv-search" class="form-control w-50" placeholder="Buscar..." onkeyup="window.renderPDVGrid()"></div>
+                        <div class="row g-3" id="pdv-grid"></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="cart-area p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3"><h5 class="fw-bold m-0">Carrinho</h5><button class="btn btn-sm btn-outline-danger rounded-pill" onclick="window.limparCarrinho()"><i class="fas fa-trash"></i></button></div>
+                            <div class="cart-items" id="pdv-cart-items"></div>
+                            <div class="mt-auto pt-3 border-top">
+                                <div class="mb-2"><label class="small fw-bold text-muted">Desconto (R$)</label><input type="number" id="pdv-desconto" class="form-control" value="0" min="0" oninput="window.renderCarrinho()"></div>
+                                <div class="d-flex justify-content-between h4 fw-bold mb-3"><span>Total:</span><span id="pdv-total" class="text-primary">R$ 0,00</span></div>
+                                <button class="btn btn-primary w-100 btn-lg rounded-pill fw-bold" onclick="window.abrirModalPagamento()">FINALIZAR</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="estoque" class="section hide">
+                <div class="d-flex justify-content-between mb-4"><h2 class="fw-bold">Estoque</h2><button class="btn btn-primary rounded-pill px-4" onclick="window.abrirModalProduto()"><i class="fas fa-plus"></i> Novo</button></div>
+                <div class="card card-custom p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="bg-light small"><tr><th class="ps-4">Produto</th><th>Qtd</th><th>Custo</th><th>Venda</th><th>Margem</th><th class="text-end pe-4">Ações</th></tr></thead><tbody id="lista-estoque"></tbody></table></div></div>
+            </div>
+
+            <div id="financeiro" class="section hide">
+                <div class="d-flex justify-content-between mb-4"><h2 class="fw-bold">Financeiro</h2><button class="btn btn-primary rounded-pill px-4" onclick="window.abrirModalFinanca()"><i class="fas fa-plus"></i> Lançar</button></div>
+                <div class="card card-custom p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="bg-light small"><tr><th class="ps-4">Tipo</th><th>Desc</th><th>Valor</th><th>Data</th><th class="text-end pe-4">Ações</th></tr></thead><tbody id="lista-financa"></tbody></table></div></div>
+            </div>
+            
+            <div id="os" class="section hide">
+                <div class="d-flex justify-content-between mb-4"><h2 class="fw-bold">Ordens de Serviço</h2><button class="btn btn-primary rounded-pill px-4" onclick="window.abrirModalOS()"><i class="fas fa-plus"></i> Nova O.S.</button></div>
+                <div class="row g-4" id="lista-os"></div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<div class="modal fade" id="modalPagamento" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-body p-4 text-center"><h1 class="fw-bold mb-4" id="modal-pag-total">R$ 0,00</h1><select id="pag-metodo" class="form-select mb-3"><option>Dinheiro</option><option>PIX</option><option>Cartão</option></select><button class="btn btn-success w-100 btn-lg rounded-pill" onclick="window.processarVenda()">CONFIRMAR</button></div></div></div></div>
+<div class="modal fade" id="modalProduto" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-body"><input type="hidden" id="prod-id"><input type="text" id="prod-nome" class="form-control mb-2" placeholder="Nome"><div class="row g-2"><div class="col-6"><input type="number" id="prod-qtd" class="form-control" placeholder="Qtd"></div><div class="col-6"><input type="number" id="prod-min" class="form-control" placeholder="Min" value="5"></div><div class="col-6"><input type="number" id="prod-custo" class="form-control" placeholder="Custo"></div><div class="col-6"><input type="number" id="prod-venda" class="form-control" placeholder="Venda"></div></div><button class="btn btn-primary w-100 mt-3" onclick="window.salvarProduto()">Salvar</button></div></div></div></div>
+<div class="modal fade" id="modalFinanca" tabindex="-1"><div class="modal-dialog modal-sm"><div class="modal-content"><div class="modal-body"><input type="text" id="fin-desc" class="form-control mb-2" placeholder="Descrição"><select id="fin-tipo" class="form-select mb-2"><option value="entrada">Entrada</option><option value="saida">Saída</option></select><input type="number" id="fin-valor" class="form-control mb-2" placeholder="Valor"><button class="btn btn-success w-100" onclick="window.salvarFinanca()">Salvar</button></div></div></div></div>
+<div class="modal fade" id="modalOS" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-body"><input type="text" id="os-cliente" class="form-control mb-2" placeholder="Cliente"><textarea id="os-desc" class="form-control mb-2" placeholder="Serviço"></textarea><div class="row g-2"><div class="col-6"><input type="number" id="os-valor" class="form-control" placeholder="Valor"></div><div class="col-6"><input type="date" id="os-data" class="form-control"></div></div><button class="btn btn-primary w-100 mt-3" onclick="window.salvarOS()">Criar</button></div></div></div></div>
+
+<div id="cupom-fiscal" class="hide p-3 bg-white text-black" style="width: 300px; font-family: 'Courier New', monospace;">
+    <div class="text-center mb-3"><h4 class="fw-bold">NEXUS ERP</h4><hr style="border-top: 2px dashed black;"></div>
+    <div id="cupom-itens"></div>
+    <hr style="border-top: 2px dashed black;">
+    <div class="d-flex justify-content-between fw-bold"><span>TOTAL:</span><span id="cupom-total"></span></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+    // --- SUA CONFIGURAÇÃO ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyBHBFj0QRebascuwJ5LxprYeuFbk7KsiYc",
+        authDomain: "nexus-erp-6998c.firebaseapp.com",
+        projectId: "nexus-erp-6998c",
+        storageBucket: "nexus-erp-6998c.firebasestorage.app",
+        messagingSenderId: "599369243365",
+        appId: "1:599369243365:web:3363fe65f3d36c00e1d20c",
+        measurementId: "G-7NFRRWYYJ6"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // --- VARIÁVEIS GLOBAIS ---
+    let produtos = [];
+    let financas = [];
+    let osList = [];
+    let historico = [];
+    let carrinho = [];
+
+    // --- AUTHENTICATION ---
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            document.getElementById('login-screen').classList.add('hide');
+            document.getElementById('app-content').style.filter = 'none';
+            document.getElementById('user-display').innerText = user.email;
+            iniciarListeners(); // Começa a baixar os dados
+        } else {
+            document.getElementById('login-screen').classList.remove('hide');
+            document.getElementById('app-content').style.filter = 'blur(5px)';
+        }
+    });
+
+    window.fazerLogin = () => {
+        const email = document.getElementById('email').value;
+        const pass = document.getElementById('password').value;
+        signInWithEmailAndPassword(auth, email, pass).catch(err => Swal.fire('Erro', err.message, 'error'));
+    };
+
+    window.criarConta = () => {
+        const email = document.getElementById('email').value;
+        const pass = document.getElementById('password').value;
+        createUserWithEmailAndPassword(auth, email, pass).then(() => Swal.fire('Sucesso', 'Conta criada!', 'success')).catch(err => Swal.fire('Erro', err.message, 'error'));
+    };
+
+    window.fazerLogout = () => signOut(auth);
+
+    // --- REAL-TIME DATABASE LISTENERS ---
+    function iniciarListeners() {
+        // Produtos
+        onSnapshot(collection(db, "produtos"), (snap) => {
+            produtos = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            window.renderEstoque(); window.renderPDVGrid(); window.atualizarDashboard();
+        });
+        // Finanças
+        onSnapshot(query(collection(db, "financas"), orderBy("dataISO", "desc")), (snap) => {
+            financas = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            window.renderFinancas(); window.atualizarDashboard(); window.renderRelatorios();
+        });
+        // OS
+        onSnapshot(collection(db, "os"), (snap) => {
+            osList = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            window.renderOS();
+        });
+        // Histórico
+        onSnapshot(query(collection(db, "historico"), orderBy("data", "desc")), (snap) => {
+            historico = snap.docs.map(d => ({id: d.id, ...d.data()}));
+            window.atualizarDashboard();
+        });
+    }
+
+    // --- UTILS ---
+    const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+    const formatDate = (d) => new Date(d).toLocaleDateString('pt-BR');
+
+    async function registrarLog(tipo, desc, valor) {
+        await addDoc(collection(db, "historico"), { tipo, desc, valor, data: new Date().toISOString() });
+    }
+
+    // --- EXPORTAR FUNÇÕES PARA HTML (WINDOW) ---
+    window.navTo = (id) => {
+        document.querySelectorAll('.section').forEach(el => { el.classList.add('hide'); el.classList.remove('fade-in'); });
+        const target = document.getElementById(id); target.classList.remove('hide');
+        setTimeout(() => target.classList.add('fade-in'), 10);
+        document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+        if(event && event.currentTarget) event.currentTarget.classList.add('active');
+    };
+
+    window.toggleMenu = (forceClose) => {
+        const sb = document.getElementById('sidebar'), ov = document.getElementById('overlay');
+        if (forceClose) { sb.classList.remove('show'); ov.classList.remove('show'); } 
+        else { sb.classList.toggle('show'); ov.classList.toggle('show'); }
+    };
+
+    // --- ESTOQUE ---
+    window.renderEstoque = (full = false) => {
+        const tb = document.getElementById('lista-estoque'); tb.innerHTML = '';
+        produtos.forEach(p => {
+            if(!full && p.qtd >= (p.min || 5)) return;
+            const luc = p.venda - p.custo, marg = p.venda > 0 ? ((luc/p.venda)*100).toFixed(0) : 0;
+            tb.innerHTML += `<tr><td class="ps-4 fw-bold">${p.nome}</td><td>${p.qtd}</td><td>${formatCurrency(p.custo)}</td><td>${formatCurrency(p.venda)}</td><td class="${marg<20?'text-danger':'text-success'} fw-bold">${marg}%</td><td class="text-end pe-4"><button class="btn btn-sm border" onclick="window.delItem('produtos','${p.id}')"><i class="fas fa-trash text-danger"></i></button></td></tr>`;
+        });
+    };
+
+    window.abrirModalProduto = () => { document.getElementById('prod-nome').value = ''; new bootstrap.Modal(document.getElementById('modalProduto')).show(); };
+    
+    window.salvarProduto = async () => {
+        const nome = document.getElementById('prod-nome').value;
+        const qtd = parseInt(document.getElementById('prod-qtd').value);
+        const custo = parseFloat(document.getElementById('prod-custo').value);
+        const venda = parseFloat(document.getElementById('prod-venda').value);
+        await addDoc(collection(db, "produtos"), { nome, qtd, min: 5, custo, venda });
+        await registrarLog('Estoque', `Novo produto: ${nome}`, 0);
+        bootstrap.Modal.getInstance(document.getElementById('modalProduto')).hide();
+        Swal.fire('Salvo', '', 'success');
+    };
+
+    // --- PDV ---
+    window.renderPDVGrid = () => {
+        const c = document.getElementById('pdv-grid'); c.innerHTML = '';
+        const search = document.getElementById('pdv-search').value.toLowerCase();
+        produtos.forEach(p => {
+            if(p.nome.toLowerCase().includes(search)) {
+                c.innerHTML += `<div class="col-6 col-lg-4"><div class="card p-3 pdv-product-card h-100" onclick="window.addCarrinho('${p.id}')"><div class="d-flex justify-content-between mb-2"><span class="badge bg-light text-secondary border">Est: ${p.qtd}</span></div><div class="fw-bold mb-1 text-truncate">${p.nome}</div><div class="h5 text-primary fw-bold">${formatCurrency(p.venda)}</div></div></div>`;
+            }
+        });
+    };
+
+    window.addCarrinho = (id) => {
+        const p = produtos.find(x => x.id === id);
+        const item = carrinho.find(c => c.id === id);
+        if (p.qtd <= (item ? item.qty : 0)) return Swal.fire('Sem estoque', '', 'error');
+        item ? item.qty++ : carrinho.push({...p, qty: 1});
+        window.renderCarrinho();
+    };
+
+    window.renderCarrinho = () => {
+        const c = document.getElementById('pdv-cart-items'); c.innerHTML = '';
+        let sub = 0;
+        carrinho.forEach((item, idx) => {
+            sub += item.venda * item.qty;
+            c.innerHTML += `<div class="d-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded"><div style="width: 40%" class="text-truncate fw-bold small">${item.nome}</div><div><span class="mx-2 fw-bold small">${item.qty}</span></div><div class="fw-bold small">${formatCurrency(item.venda * item.qty)}</div></div>`;
+        });
+        const desc = parseFloat(document.getElementById('pdv-desconto').value) || 0;
+        const total = Math.max(0, sub - desc);
+        document.getElementById('pdv-total').innerText = formatCurrency(total);
+        document.getElementById('modal-pag-total').innerText = formatCurrency(total);
+    };
+
+    window.limparCarrinho = () => { carrinho = []; window.renderCarrinho(); };
+    window.abrirModalPagamento = () => { if(!carrinho.length) return; new bootstrap.Modal(document.getElementById('modalPagamento')).show(); };
+
+    window.processarVenda = async () => {
+        const metodo = document.getElementById('pag-metodo').value;
+        let sub = 0, cupomHtml = '';
+        
+        for (const item of carrinho) {
+            const p = produtos.find(x => x.id === item.id);
+            if(p) {
+                await updateDoc(doc(db, "produtos", p.id), { qtd: p.qtd - item.qty });
+                sub += item.venda * item.qty;
+                cupomHtml += `<div class="d-flex justify-content-between small"><span>${item.qty}x ${item.nome}</span><span>${formatCurrency(item.venda*item.qty)}</span></div>`;
+            }
+        }
+        
+        const desc = parseFloat(document.getElementById('pdv-desconto').value) || 0;
+        const total = Math.max(0, sub - desc);
+
+        await addDoc(collection(db, "financas"), { tipo: 'entrada', desc: `Venda PDV (${metodo})`, metodo, valor: total, dataISO: new Date().toISOString() });
+        await registrarLog('Venda', `Venda PDV (${carrinho.length} itens)`, total);
+
+        bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
+        
+        Swal.fire({title: 'Venda Realizada', icon: 'success', showCancelButton: true, confirmButtonText: 'Imprimir'}).then((r) => {
+            if (r.isConfirmed) {
+                document.getElementById('cupom-itens').innerHTML = cupomHtml;
+                document.getElementById('cupom-total').innerText = formatCurrency(total);
+                window.print();
+            }
+            window.limparCarrinho();
+        });
+    };
+
+    // --- FINANCEIRO ---
+    window.abrirModalFinanca = () => new bootstrap.Modal(document.getElementById('modalFinanca')).show();
+    window.salvarFinanca = async () => {
+        await addDoc(collection(db, "financas"), {
+            desc: document.getElementById('fin-desc').value,
+            tipo: document.getElementById('fin-tipo').value,
+            valor: parseFloat(document.getElementById('fin-valor').value),
+            metodo: 'Manual',
+            dataISO: new Date().toISOString()
+        });
+        bootstrap.Modal.getInstance(document.getElementById('modalFinanca')).hide();
+        Swal.fire('Lançado', '', 'success');
+    };
+
+    window.renderFinancas = () => {
+        const tb = document.getElementById('lista-financa'); tb.innerHTML = '';
+        financas.forEach(f => {
+            const isEnt = f.tipo === 'entrada';
+            tb.innerHTML += `<tr><td class="ps-4"><i class="fas ${isEnt?'fa-arrow-up text-success':'fa-arrow-down text-danger'}"></i></td><td>${f.desc}</td><td class="fw-bold ${isEnt?'text-success':'text-danger'}">${isEnt?'+':'-'} ${formatCurrency(f.valor)}</td><td>${formatDate(f.dataISO)}</td><td class="text-end pe-4"><button class="btn btn-sm border" onclick="window.delItem('financas','${f.id}')"><i class="fas fa-trash text-danger"></i></button></td></tr>`;
+        });
+    };
+
+    // --- OS ---
+    window.abrirModalOS = () => new bootstrap.Modal(document.getElementById('modalOS')).show();
+    window.salvarOS = async () => {
+        await addDoc(collection(db, "os"), {
+            cliente: document.getElementById('os-cliente').value,
+            desc: document.getElementById('os-desc').value,
+            valor: parseFloat(document.getElementById('os-valor').value),
+            prazo: document.getElementById('os-data').value,
+            dataCriacao: new Date().toISOString(),
+            concluido: false
+        });
+        bootstrap.Modal.getInstance(document.getElementById('modalOS')).hide();
+        Swal.fire('OS Criada', '', 'success');
+    };
+
+    window.renderOS = () => {
+        const c = document.getElementById('lista-os'); c.innerHTML = '';
+        osList.forEach(o => {
+            c.innerHTML += `<div class="col-md-4"><div class="card card-custom h-100 p-3 border-start border-4 ${o.concluido?'border-success':'border-warning'}"><div class="d-flex justify-content-between mb-2"><span class="badge ${o.concluido?'bg-success':'bg-warning'}">${o.concluido?'Concluído':'Pendente'}</span><small>${formatDate(o.dataCriacao)}</small></div><h5 class="fw-bold">${o.cliente}</h5><p class="text-muted small">${o.desc}</p><div class="d-flex justify-content-between align-items-center mt-3"><span class="fw-bold text-primary">${formatCurrency(o.valor)}</span><button class="btn btn-sm btn-outline-danger" onclick="window.delItem('os','${o.id}')"><i class="fas fa-trash"></i></button></div></div></div>`;
+        });
+    };
+
+    // --- GERAIS ---
+    window.delItem = async (col, id) => {
+        if(confirm('Tem certeza?')) {
+            await deleteDoc(doc(db, col, id));
+            if(col === 'historico') window.atualizarDashboard();
+        }
+    };
+
+    window.atualizarDashboard = () => {
+        let ent = 0, sai = 0;
+        const mesAtual = new Date().getMonth();
+        financas.filter(f => new Date(f.dataISO).getMonth() === mesAtual).forEach(f => f.tipo==='entrada'? ent+=f.valor : sai+=f.valor);
+        
+        document.getElementById('dash-entradas').innerText = formatCurrency(ent);
+        document.getElementById('dash-saidas').innerText = formatCurrency(sai);
+        document.getElementById('dash-saldo').innerText = formatCurrency(ent - sai);
+        
+        const critico = produtos.filter(p => p.qtd < (p.min || 5)).length;
+        document.getElementById('dash-estoque-baixo').innerText = critico;
+
+        const tb = document.getElementById('dash-ultimas-movimentacoes'); tb.innerHTML = '';
+        historico.slice(0, 6).forEach(h => {
+            tb.innerHTML += `<tr><td><span class="badge bg-secondary">${h.tipo}</span></td><td>${h.desc}</td><td class="fw-bold">${formatCurrency(h.valor)}</td><td><div class="d-flex justify-content-between"><span>${formatDate(h.data)}</span><button class="btn btn-sm text-danger" onclick="window.delItem('historico','${h.id}')">X</button></div></td></tr>`;
+        });
+    };
+
+    window.renderRelatorios = () => {
+        let ent = 0, sai = 0;
+        financas.forEach(f => f.tipo==='entrada'? ent+=f.valor : sai+=f.valor);
+        const lucro = ent - sai;
+        const margem = ent > 0 ? ((lucro/ent)*100).toFixed(0) : 0;
+        
+        document.getElementById('rel-margem').innerText = margem + '%';
+        document.getElementById('rel-margem').className = `fw-bold display-5 ${margem>=0?'text-success':'text-danger'}`;
+        
+        const total = ent + sai;
+        document.getElementById('bar-receita').style.width = total ? (ent/total)*100 + '%' : '0%';
+        document.getElementById('bar-despesa').style.width = total ? (sai/total)*100 + '%' : '0%';
+        
+        document.getElementById('rel-total-entradas').innerText = formatCurrency(ent);
+        document.getElementById('rel-total-saidas').innerText = formatCurrency(sai);
+        document.getElementById('rel-resultado').innerText = formatCurrency(lucro);
+    };
+
+    // Init
+    window.navTo('dashboard');
+</script>
+</body>
+</html>
