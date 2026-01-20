@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#4f46e5">
-    <title>Nexus ERP v29.0 - Demo & OS Table</title>
+    <title>Nexus ERP v28.1 - Crédito Inteligente</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -124,14 +124,15 @@
         <div class="mb-4">
             <div class="bg-primary bg-opacity-10 d-inline-block p-3 rounded-circle mb-3"><i class="fas fa-layer-group fa-3x text-primary"></i></div>
             <h2 class="fw-bold">NEXUS CLOUD</h2>
-            <p class="text-muted small">v29.0 Demo & OS Table</p>
+            <p class="text-muted small">v28.1 Crédito Inteligente</p>
         </div>
         <input type="email" id="email-login" class="form-control form-control-lg mb-3 bg-light border-0" placeholder="E-mail">
         <input type="password" id="senha-login" class="form-control form-control-lg mb-3 bg-light border-0" placeholder="Senha">
         <div class="d-grid gap-2">
             <button onclick="tentarLogin(this)" class="btn btn-primary btn-lg fw-bold rounded-pill">ENTRAR</button>
-            <button onclick="entrarDemo()" class="btn btn-warning btn-lg fw-bold rounded-pill text-white"><i class="fas fa-flask me-2"></i> MODO DEMONSTRAÇÃO (BETA)</button>
             <button onclick="tentarCriarConta(this)" class="btn btn-outline-secondary btn-lg fw-bold rounded-pill">CRIAR CONTA</button>
+            <hr>
+            <button onclick="entrarModoDemo(this)" class="btn btn-warning btn-lg fw-bold rounded-pill text-white"><i class="fas fa-flask me-2"></i>MODO DEMO (TESTE)</button>
         </div>
         <small class="text-muted mt-3 d-block" id="status-login"></small>
     </div>
@@ -285,12 +286,22 @@
         <div id="financeiro" class="section hide"><div class="d-flex justify-content-between mb-4"><h3 class="fw-bold">Financeiro</h3><div class="d-flex gap-2"><input type="text" id="busca-financa" class="form-control rounded-pill" placeholder="🔍 Buscar..." onkeyup="renderFinancas()"><button class="btn btn-outline-success rounded-pill" onclick="exportarDados('financas')"><i class="fas fa-file-excel"></i></button><button class="btn btn-primary rounded-pill fw-bold shadow-sm" onclick="abrirModalFinanca()"><i class="fas fa-plus"></i> Lançar</button></div></div><div class="card card-custom p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="bg-light text-muted small text-uppercase"><tr><th class="ps-4">Tipo</th><th>Desc</th><th>Valor</th><th>Data</th><th class="text-end pe-4">Ações</th></tr></thead><tbody id="lista-financa"></tbody></table></div></div></div>
         
         <div id="os" class="section hide">
-            <div class="d-flex justify-content-between mb-4"><h3 class="fw-bold">Ordens de Serviço</h3><button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" onclick="abrirModalOS()"><i class="fas fa-plus me-2"></i> Nova O.S.</button></div>
+            <div class="d-flex justify-content-between mb-4">
+                <h3 class="fw-bold">Ordens de Serviço</h3>
+                <button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" onclick="abrirModalOS()"><i class="fas fa-plus me-2"></i> Nova O.S.</button>
+            </div>
             <div class="card card-custom p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light text-muted small text-uppercase">
-                            <tr><th class="ps-4">Cliente</th><th>Serviço / Defeito</th><th>Prazo</th><th>Valor</th><th>Status</th><th class="text-end pe-4">Ações</th></tr>
+                            <tr>
+                                <th class="ps-4">Cliente</th>
+                                <th>Descrição/Defeito</th>
+                                <th>Prazo</th>
+                                <th>Valor</th>
+                                <th>Status</th>
+                                <th class="text-end pe-4">Ações</th>
+                            </tr>
                         </thead>
                         <tbody id="lista-os"></tbody>
                     </table>
@@ -333,81 +344,121 @@
 
     // VARIÁVEIS GLOBAIS
     let currentUser = null;
+    let isDemoMode = false; // Flag para modo demonstração
     let produtos=[], financas=[], osList=[], historico=[], carrinho=[], fiados=[], contas=[];
     let configEmpresa = { nome: 'NEXUS ERP', cnpj: '', end: '', tel: '', msg: 'Volte Sempre!', apikey: '' };
     let iaMode = 'comando', iaContext = null;
     let recognition;
     let descTipo = 'money';
     let chartFin = null, chartMet = null;
-    let isDemo = false; // FLAG DEMO
 
+    // SIMULADOR DE BANCO DE DADOS (MOCK) PARA MODO DEMO
+    const MockDB = {
+        collection: (col) => ({
+            doc: (id) => {
+                const docId = id || 'demo_'+Date.now();
+                return {
+                    id: docId,
+                    set: async (data) => { if(col==='financas') financas.unshift({...data, id:docId}); if(col==='historico') historico.unshift({...data, id:docId}); if(col==='os') osList.push({...data, id:docId}); atualizarDashboard(); },
+                    update: async (data) => { 
+                        if(col==='os') { const idx = osList.findIndex(x=>x.id===id); if(idx>=0) osList[idx] = {...osList[idx], ...data}; }
+                        if(col==='produtos') { const idx = produtos.findIndex(x=>x.id===id); if(idx>=0) produtos[idx] = {...produtos[idx], ...data}; }
+                        if(col==='fiados') { const idx = fiados.findIndex(x=>x.id===id); if(idx>=0) fiados[idx] = {...fiados[idx], ...data}; }
+                        atualizarDashboard(); 
+                    },
+                    delete: async () => { 
+                        if(col==='os') osList = osList.filter(x=>x.id!==id);
+                        if(col==='financas') financas = financas.filter(x=>x.id!==id);
+                        if(col==='produtos') produtos = produtos.filter(x=>x.id!==id);
+                        if(col==='contas') contas = contas.filter(x=>x.id!==id);
+                        atualizarDashboard(); renderOS(); renderFinancas(); renderEstoque(); renderContas();
+                    },
+                    get: async () => ({ data: () => {
+                         if(col==='fiados') return fiados.find(f=>f.id===id);
+                         return {};
+                    } })
+                }
+            },
+            add: async (data) => { 
+                const newId = 'demo_'+Date.now(); 
+                if(col==='historico') historico.unshift({...data, id:newId});
+                if(col==='financas') financas.unshift({...data, id:newId});
+                if(col==='os') { osList.push({...data, id:newId}); renderOS(); }
+                if(col==='contas') { contas.push({...data, id:newId}); renderContas(); }
+                if(col==='produtos') { produtos.push({...data, id:newId}); renderEstoque(); }
+                if(col==='fiados') { fiados.push({...data, id:newId}); renderFiados(); }
+                atualizarDashboard();
+                return { id: newId };
+            },
+            orderBy: () => ({ limit: () => ({ onSnapshot: () => {} }) }), // Dummy listeners
+            onSnapshot: () => {} 
+        })
+    };
+
+    // Funções de Referência (Adaptadas para Demo)
     function getUserRef(c) { 
-        if (isDemo) return null; // Demo Mode não usa Firebase real aqui
+        if (isDemoMode) return MockDB.collection(c);
         return currentUser ? db.collection("users").doc(currentUser.uid).collection(c) : null; 
     }
     
     function getConfigRef() { 
-        if (isDemo) return null;
+        if (isDemoMode) return { set: async (d) => { configEmpresa = d; }, onSnapshot: (cb) => cb({exists:true, data:()=>configEmpresa}) };
         return currentUser ? db.collection("users").doc(currentUser.uid).collection("config").doc("geral") : null; 
     }
-    
+
     function setLoading(btn, isLoading) { if(isLoading) { btn.disabled=true; btn.orig=btn.innerHTML; btn.innerHTML='<span class="spinner-border spinner-border-sm"></span>'; } else { btn.disabled=false; btn.innerHTML=btn.orig; } }
 
     function tentarLogin(btn) { setLoading(btn,true); auth.signInWithEmailAndPassword(document.getElementById('email-login').value, document.getElementById('senha-login').value).catch(e=>{Swal.fire('Erro',e.message,'error'); setLoading(btn,false)}); }
     function tentarCriarConta(btn) { setLoading(btn,true); auth.createUserWithEmailAndPassword(document.getElementById('email-login').value, document.getElementById('senha-login').value).then(()=>{Swal.fire('Sucesso','','success')}).catch(e=>{Swal.fire('Erro',e.message,'error'); setLoading(btn,false)}); }
-    function fazerLogout() { 
-        if(isDemo) { isDemo = false; location.reload(); return; }
-        auth.signOut(); location.reload(); 
-    }
+    function fazerLogout() { auth.signOut(); location.reload(); }
 
-    // --- MODO DEMONSTRAÇÃO (BETA) ---
-    function entrarDemo() {
-        isDemo = true;
-        currentUser = { uid: 'demo', email: 'demo@nexus.ai' };
-        document.getElementById('login-screen').classList.add('hide');
-        document.getElementById('app-content').style.filter='none';
-        document.getElementById('user-display').innerText = "Modo Demonstração (Dados Fictícios)";
-        
-        // POPULA DADOS FICTÍCIOS
-        produtos = [
-            { id: '1', nome: 'Teclado Gamer', qtd: 15, custo: 50, venda: 120, min: 5 },
-            { id: '2', nome: 'Mouse Sem Fio', qtd: 3, custo: 20, venda: 45, min: 5 },
-            { id: '3', nome: 'Monitor 24pol', qtd: 8, custo: 600, venda: 950, min: 2 }
-        ];
-        fiados = [
-            { id: 'f1', cliente: 'João Silva', valorRestante: 150, saldoCredito: 0, zap: '11999999999' },
-            { id: 'f2', cliente: 'Maria Souza', valorRestante: 0, saldoCredito: 50, zap: '11888888888' }
-        ];
-        osList = [
-            { id: 'os1', cliente: 'Carlos Tech', desc: 'Formatação e Limpeza', valor: 80, prazo: '2023-12-01', concluido: false, dataCriacao: new Date().toISOString() },
-            { id: 'os2', cliente: 'Ana Design', desc: 'Troca de Tela Notebook', valor: 450, prazo: '2023-11-20', concluido: true, dataCriacao: new Date().toISOString() }
-        ];
-        financas = [
-            { id: 'fin1', tipo: 'entrada', desc: 'Venda Balcão', valor: 120, dataISO: new Date().toISOString() },
-            { id: 'fin2', tipo: 'saida', desc: 'Pagamento Luz', valor: 250, dataISO: new Date().toISOString() }
-        ];
-        historico = [
-            { tipo: 'Venda', desc: '1x Teclado Gamer', valor: 120 },
-            { tipo: 'Despesa', desc: 'Luz', valor: 250 }
-        ];
-        contas = [
-            { id: 'c1', desc: 'Aluguel Loja', valor: 1200, venc: '2025-05-10', recorrente: true }
-        ];
+    // NOVA FUNÇÃO: MODO DEMO
+    function entrarModoDemo(btn) {
+        setLoading(btn, true);
+        setTimeout(() => {
+            isDemoMode = true;
+            currentUser = { uid: 'demo_user', email: 'demo@nexus.ai' };
+            document.getElementById('login-screen').classList.add('hide');
+            document.getElementById('app-content').style.filter='none';
+            document.getElementById('user-display').innerText = "MODO DEMO";
+            
+            // Carregar Dados Fictícios
+            produtos = [
+                {id:'1', nome:'Coca Cola 2L', qtd:50, custo:6.00, venda:10.00, min:10},
+                {id:'2', nome:'Cabo USB-C', qtd:20, custo:5.00, venda:25.00, min:5},
+                {id:'3', nome:'Fone Bluetooth', qtd:3, custo:40.00, venda:90.00, min:5},
+                {id:'4', nome:'Carregador Turbo', qtd:15, custo:15.00, venda:45.00, min:5}
+            ];
+            fiados = [
+                {id:'1', cliente:'João Silva', zap:'11999999999', valorRestante:50.00, saldoCredito:0},
+                {id:'2', cliente:'Maria Souza', zap:'', valorRestante:0, saldoCredito:10.00}
+            ];
+            osList = [
+                {id:'1', cliente:'Pedro Ramos', desc:'Formatar PC', valor:80.00, prazo:'2026-02-10', concluido:false, dataCriacao: new Date().toISOString()},
+                {id:'2', cliente:'Loja XYZ', desc:'Instalar Rede', valor:250.00, prazo:'2026-02-01', concluido:true, dataCriacao: new Date().toISOString()}
+            ];
+            financas = [
+                {id:'1', tipo:'entrada', desc:'Venda Balcão', valor:150.00, dataISO: new Date().toISOString()},
+                {id:'2', tipo:'saida', desc:'Compra Estoque', valor:50.00, dataISO: new Date().toISOString()}
+            ];
+            historico = [
+                {id:'1', tipo:'Venda', desc:'Coca Cola', valor:10.00, data: new Date().toISOString()}
+            ];
 
-        // Renderiza tudo
-        renderEstoque(); renderPDVGrid(); atualizarDashboard(); renderFiados(); renderOS(); renderFinancas(); renderContas();
-        setupVoiceRecognition();
-        setIAMode('comando');
-        Swal.fire({toast: true, icon: 'info', title: 'Modo Demonstração Ativado', position: 'top', timer: 3000});
+            // Renderizar tudo
+            renderEstoque(); renderPDVGrid(); renderFiados(); renderOS(); renderFinancas(); atualizarDashboard(); renderRelatorios();
+            setIAMode('comando');
+            Swal.fire('Modo Demo Ativado', 'Os dados salvos aqui não persistem.', 'info');
+        }, 1000);
     }
 
     auth.onAuthStateChanged(u => {
-        if(u && !isDemo) { currentUser=u; document.getElementById('login-screen').classList.add('hide'); document.getElementById('app-content').style.filter='none'; document.getElementById('user-display').innerText=u.email; iniciarSistema(); }
-        else if (!isDemo) { document.getElementById('login-screen').classList.remove('hide'); document.getElementById('app-content').style.filter='blur(5px)'; }
+        if(u && !isDemoMode) { currentUser=u; document.getElementById('login-screen').classList.add('hide'); document.getElementById('app-content').style.filter='none'; document.getElementById('user-display').innerText=u.email; iniciarSistema(); }
+        else if (!isDemoMode) { document.getElementById('login-screen').classList.remove('hide'); document.getElementById('app-content').style.filter='blur(5px)'; }
     });
 
     function iniciarSistema() {
-        if(!currentUser || isDemo) return; // Se for demo, não conecta listeners reais
+        if(!currentUser || isDemoMode) return;
         getUserRef("produtos").onSnapshot(s => { produtos = s.docs.map(d=>({id:d.id, ...d.data()})); renderEstoque(); renderPDVGrid(); atualizarDashboard(); });
         getUserRef("financas").orderBy("dataISO","desc").limit(50).onSnapshot(s => { financas = s.docs.map(d=>({id:d.id, ...d.data()})); renderFinancas(); atualizarDashboard(); if(document.getElementById('relatorios').classList.contains('hide') === false) renderRelatorios(); });
         getUserRef("historico").orderBy("data","desc").limit(20).onSnapshot(s => { historico = s.docs.map(d=>({id:d.id, ...d.data()})); atualizarDashboard(); });
@@ -417,75 +468,6 @@
         getConfigRef().onSnapshot(s => { if(s.exists) { configEmpresa = s.data(); carregarConfigUI(); } });
         setupVoiceRecognition();
         setIAMode('comando');
-    }
-
-    // MOCK FUNCTIONS FOR DEMO MODE
-    // Essas funções interceptam as chamadas ao Firebase se estiver em modo Demo
-    async function mockAddData(col, data, btn) {
-        if (btn) setLoading(btn, true);
-        await new Promise(r => setTimeout(r, 500)); // Simula delay
-        data.id = 'demo_' + Date.now();
-        if (col === 'produtos') produtos.push(data);
-        if (col === 'financas') financas.unshift(data); // Add no começo
-        if (col === 'historico') historico.unshift(data);
-        if (col === 'os') osList.push(data);
-        if (col === 'fiados') fiados.push(data);
-        if (col === 'contas') contas.push(data);
-        
-        // Re-render
-        if(col === 'produtos') { renderEstoque(); renderPDVGrid(); }
-        if(col === 'financas') renderFinancas();
-        if(col === 'os') renderOS();
-        if(col === 'fiados') renderFiados();
-        if(col === 'contas') renderContas();
-        atualizarDashboard();
-
-        if (btn) { setLoading(btn, false); bootstrap.Modal.getInstance(btn.closest('.modal')).hide(); }
-        Swal.fire({toast:true, icon:'success', title:'Salvo (Demo)', position:'top-end', showConfirmButton:false, timer:1000});
-    }
-
-    async function mockUpdate(col, id, data) {
-        let arr = col==='produtos'?produtos : col==='os'?osList : col==='fiados'?fiados : [];
-        let idx = arr.findIndex(x => x.id === id);
-        if(idx >= 0) {
-            arr[idx] = { ...arr[idx], ...data };
-            if(col === 'produtos') { renderEstoque(); renderPDVGrid(); }
-            if(col === 'os') renderOS();
-            if(col === 'fiados') renderFiados();
-            atualizarDashboard();
-        }
-    }
-
-    async function mockDelete(col, id) {
-        if(col==='produtos') produtos = produtos.filter(x => x.id !== id);
-        if(col==='financas') financas = financas.filter(x => x.id !== id);
-        if(col==='os') osList = osList.filter(x => x.id !== id);
-        if(col==='fiados') fiados = fiados.filter(x => x.id !== id);
-        if(col==='contas') contas = contas.filter(x => x.id !== id);
-        
-        if(col === 'produtos') { renderEstoque(); renderPDVGrid(); }
-        if(col === 'financas') renderFinancas();
-        if(col === 'os') renderOS();
-        if(col === 'fiados') renderFiados();
-        if(col === 'contas') renderContas();
-        atualizarDashboard();
-    }
-
-    // WRAPPERS PARA UNIFICAR LOGICA
-    async function addData(col, d, btn) {
-        if(isDemo) return mockAddData(col, d, btn);
-        if(btn) setLoading(btn,true); 
-        await getUserRef(col).add(d); 
-        if(btn){ setLoading(btn,false); bootstrap.Modal.getInstance(btn.closest('.modal')).hide(); Swal.fire({toast:true,icon:'success',title:'Salvo',position:'top-end',showConfirmButton:false,timer:1000}); }
-    }
-    
-    function del(col, id) {
-        Swal.fire({title:'Excluir?',icon:'warning',showCancelButton:true,confirmButtonColor:'#d33'}).then(r=>{
-            if(r.isConfirmed) {
-                if(isDemo) mockDelete(col, id);
-                else getUserRef(col).doc(id).delete();
-            }
-        });
     }
 
     // DASHBOARD & ALERTAS
@@ -582,6 +564,7 @@
 
     function abrirModalPagamento(){ if(carrinho.length) new bootstrap.Modal(document.getElementById('modalPagamento')).show(); }
 
+    // VENDA COM CRÉDITO AUTOMÁTICO
     async function processarVenda(btn){ 
         const metodo = document.getElementById('pag-metodo').value; 
         if(!metodo) return Swal.fire('Erro','Selecione o método de pagamento','error');
@@ -591,60 +574,54 @@
         if(metodo === 'Fiado' && !clienteNome) return Swal.fire('Erro','Nome do cliente obrigatório para Fiado','error');
 
         setLoading(btn,true);
-        const batch = isDemo ? null : db.batch(); // Demo não usa batch
+        const batch = isDemoMode ? MockDB : db.batch();
         const dataISO = new Date().toISOString();
         
-        // Atualiza Estoque
-        if (isDemo) {
-            carrinho.forEach(i => mockUpdate('produtos', i.id, { qtd: produtos.find(p=>p.id===i.id).qtd - i.qty }));
-        } else {
-            carrinho.forEach(i => batch.update(getUserRef("produtos").doc(i.id), { qtd: firebase.firestore.FieldValue.increment(-i.qty) }));
-        }
+        carrinho.forEach(i => { batch.update(getUserRef("produtos").doc(i.id), { qtd: firebase.firestore.FieldValue.increment(-i.qty) }); });
 
         let valorFinal = total;
         let usouCredito = 0;
         let clienteDoc = fiados.find(f => norm(f.cliente) === norm(clienteNome));
-        let clienteRef = (!isDemo && clienteDoc) ? getUserRef("fiados").doc(clienteDoc.id) : null;
+        let clienteRef = clienteDoc ? getUserRef("fiados").doc(clienteDoc.id) : getUserRef("fiados").doc();
 
-        // Lógica de Crédito
-        if (clienteDoc && clienteDoc.saldoCredito > 0 && metodo !== 'Fiado') {
-             if (confirm(`Usar crédito de ${formatCurrency(clienteDoc.saldoCredito)}?`)) {
-                 if (clienteDoc.saldoCredito >= valorFinal) {
-                     usouCredito = valorFinal; valorFinal = 0;
-                     if(isDemo) mockUpdate('fiados', clienteDoc.id, { saldoCredito: clienteDoc.saldoCredito - usouCredito });
-                     else batch.update(clienteRef, { saldoCredito: clienteDoc.saldoCredito - usouCredito });
-                 } else {
-                     usouCredito = clienteDoc.saldoCredito; valorFinal = valorFinal - usouCredito;
-                     if(isDemo) mockUpdate('fiados', clienteDoc.id, { saldoCredito: 0 });
-                     else batch.update(clienteRef, { saldoCredito: 0 });
-                 }
-             }
+        if (clienteDoc && clienteDoc.saldoCredito > 0) {
+            if (metodo === 'Fiado') {
+                if (clienteDoc.saldoCredito >= valorFinal) {
+                    usouCredito = valorFinal; valorFinal = 0;
+                    batch.update(clienteRef, { saldoCredito: clienteDoc.saldoCredito - usouCredito });
+                } else {
+                    usouCredito = clienteDoc.saldoCredito; valorFinal = valorFinal - usouCredito;
+                    batch.update(clienteRef, { saldoCredito: 0 });
+                }
+            } else {
+                if (confirm(`Usar crédito de ${formatCurrency(clienteDoc.saldoCredito)}?`)) {
+                    if (clienteDoc.saldoCredito >= valorFinal) {
+                        usouCredito = valorFinal; valorFinal = 0;
+                        batch.update(clienteRef, { saldoCredito: clienteDoc.saldoCredito - usouCredito });
+                    } else {
+                        usouCredito = clienteDoc.saldoCredito; valorFinal = valorFinal - usouCredito;
+                        batch.update(clienteRef, { saldoCredito: 0 });
+                    }
+                }
+            }
         }
 
         if(valorFinal > 0) {
             if(metodo === 'Fiado') {
-                if(clienteDoc) {
-                    if(isDemo) mockUpdate('fiados', clienteDoc.id, { valorRestante: (clienteDoc.valorRestante||0) + valorFinal });
-                    else batch.update(clienteRef, { valorRestante: (clienteDoc.valorRestante || 0) + valorFinal, ultimaAtualizacao: dataISO });
-                } else {
-                    const novoCli = { cliente: clienteNome, zap: document.getElementById('cliente-zap').value, valorRestante: valorFinal, saldoCredito: 0, dataCompra: dataISO, ultimaAtualizacao: dataISO };
-                    if(isDemo) mockAddData('fiados', novoCli);
-                    else batch.set(getUserRef("fiados").doc(), novoCli);
-                }
+                if(clienteDoc) batch.update(clienteRef, { valorRestante: (clienteDoc.valorRestante || 0) + valorFinal, ultimaAtualizacao: dataISO });
+                else batch.set(clienteRef, { cliente: clienteNome, zap: document.getElementById('cliente-zap').value, valorRestante: valorFinal, saldoCredito: 0, dataCompra: dataISO, ultimaAtualizacao: dataISO });
             } else {
-                const novaFin = { tipo: 'entrada', desc: `Venda PDV - ${clienteNome || 'Consumidor Final'}`, metodo: metodo, valor: valorFinal, dataISO: dataISO };
-                if(isDemo) mockAddData('financas', novaFin);
-                else batch.set(getUserRef("financas").doc(), novaFin);
+                batch.set(getUserRef("financas").doc(), { tipo: 'entrada', desc: `Venda PDV - ${clienteNome || 'Consumidor Final'}`, metodo: metodo, valor: valorFinal, dataISO: dataISO });
             }
+        } else if (usouCredito > 0) {
+             batch.set(getUserRef("financas").doc(), { tipo: 'entrada', desc: `Venda Crédito - ${clienteNome}`, metodo: 'Crédito Loja', valor: total, dataISO: dataISO });
         }
 
         let descHist = `Venda ${metodo}`;
         if(usouCredito > 0) descHist += ` (Crédito ${formatCurrency(usouCredito)})`;
-        
-        if(isDemo) mockAddData('historico', { tipo: 'Venda', desc: descHist, valor: total, data: dataISO });
-        else batch.set(getUserRef("historico").doc(), { tipo: 'Venda', desc: descHist, valor: total, data: dataISO });
+        batch.set(getUserRef("historico").doc(), { tipo: 'Venda', desc: descHist, valor: total, data: dataISO });
 
-        if(!isDemo) await batch.commit();
+        if(!isDemoMode) await batch.commit();
         setLoading(btn,false);
         
         const dadosVendaImpressao = {
@@ -653,7 +630,7 @@
             total: total,
             subtotal: carrinho.reduce((acc, i) => acc + i.venda * i.qty, 0),
             desconto: total < carrinho.reduce((acc, i) => acc + i.venda * i.qty, 0) ? (carrinho.reduce((acc, i) => acc + i.venda * i.qty, 0) - total) : 0,
-            metodo: usouCredito > 0 ? (valorFinal > 0 ? `Crédito + ${(metodo === 'Fiado' ? 'A Pagar' : metodo)}` : 'Crédito Loja') : (metodo === 'Fiado' ? 'A Pagar' : metodo),
+            metodo: usouCredito > 0 ? (valorFinal > 0 ? `Crédito + ${metodo}` : 'Crédito Loja') : metodo,
             data: new Date()
         };
 
@@ -670,7 +647,13 @@
     function imprimirCupom(venda) {
         let itensHtml = '';
         venda.itens.forEach(i => { itensHtml += `<div class="cupom-row"><span>${esc(i.nome).substring(0,15)}</span><span>${i.qty}x ${formatCurrency(i.venda)}</span></div>`; });
-        const html = `<div class="cupom-fiscal"><h4>${esc(configEmpresa.nome)}</h4><p style="text-align:center; font-size:10px;">${new Date(venda.data).toLocaleString()}</p><div class="cupom-divider"></div>${venda.cliente ? `<p>Cliente: ${esc(venda.cliente)}</p><div class="cupom-divider"></div>` : ''}${itensHtml}<div class="cupom-divider"></div><div class="cupom-row"><span>Subtotal:</span><span>${formatCurrency(venda.subtotal)}</span></div>${venda.desconto > 0 ? `<div class="cupom-row"><span>Desconto:</span><span>-${formatCurrency(venda.desconto)}</span></div>` : ''}<div class="cupom-row cupom-total"><span>TOTAL:</span><span>${formatCurrency(venda.total)}</span></div><div class="cupom-row" style="margin-top:5px;"><span>Pagamento:</span><span>${venda.metodo}</span></div><div class="cupom-divider"></div><p style="text-align:center; font-size:10px;">${esc(configEmpresa.msg)}</p></div>`;
+        
+        // CORREÇÃO: Trocar o nome "Fiado" por "Saldo Devedor" na impressão
+        let metodoDisplay = venda.metodo;
+        if(venda.metodo === 'Fiado') metodoDisplay = 'Saldo Devedor';
+        if(venda.metodo.includes('Fiado')) metodoDisplay = venda.metodo.replace('Fiado', 'Saldo Devedor');
+
+        const html = `<div class="cupom-fiscal"><h4>${esc(configEmpresa.nome)}</h4><p style="text-align:center; font-size:10px;">${new Date(venda.data).toLocaleString()}</p><div class="cupom-divider"></div>${venda.cliente ? `<p>Cliente: ${esc(venda.cliente)}</p><div class="cupom-divider"></div>` : ''}${itensHtml}<div class="cupom-divider"></div><div class="cupom-row"><span>Subtotal:</span><span>${formatCurrency(venda.subtotal)}</span></div>${venda.desconto > 0 ? `<div class="cupom-row"><span>Desconto:</span><span>-${formatCurrency(venda.desconto)}</span></div>` : ''}<div class="cupom-row cupom-total"><span>TOTAL:</span><span>${formatCurrency(venda.total)}</span></div><div class="cupom-row" style="margin-top:5px;"><span>Pagamento:</span><span>${metodoDisplay}</span></div><div class="cupom-divider"></div><p style="text-align:center; font-size:10px;">${esc(configEmpresa.msg)}</p></div>`;
         imprimirConteudo(html);
     }
 
@@ -712,12 +695,10 @@
         let novoSaldo = (cliente.saldoCredito || 0) + (valInput * fator);
         if(novoSaldo < 0) novoSaldo = 0;
 
-        if(isDemo) mockUpdate('fiados', id, {saldoCredito: novoSaldo});
-        else await getUserRef("fiados").doc(id).update({ saldoCredito: novoSaldo });
+        await getUserRef("fiados").doc(id).update({ saldoCredito: novoSaldo });
         
         const tipoMov = fator > 0 ? "Adição" : "Remoção";
-        if(isDemo) mockAddData('historico', {tipo: "Crédito", desc: `${tipoMov} Crédito - ${cliente.cliente}`, valor: valInput, data: new Date().toISOString()});
-        else await log("Crédito", `${tipoMov} Crédito - ${cliente.cliente}`, valInput);
+        await log("Crédito", `${tipoMov} Crédito - ${cliente.cliente}`, valInput);
         
         bootstrap.Modal.getInstance(document.getElementById('modalCredito')).hide();
         Swal.fire('Atualizado', `Novo saldo: ${formatCurrency(novoSaldo)}`, 'success');
@@ -735,13 +716,10 @@
         const clienteExistente = fiados.find(f => norm(f.cliente) === norm(nome));
         if(clienteExistente) {
             const novaDivida = (clienteExistente.valorRestante || 0) + valor;
-            if(isDemo) mockUpdate('fiados', clienteExistente.id, { valorRestante: novaDivida, zap: zap || clienteExistente.zap });
-            else await getUserRef("fiados").doc(clienteExistente.id).update({ valorRestante: novaDivida, zap: zap || clienteExistente.zap, ultimaAtualizacao: new Date().toISOString() });
+            await getUserRef("fiados").doc(clienteExistente.id).update({ valorRestante: novaDivida, zap: zap || clienteExistente.zap, ultimaAtualizacao: new Date().toISOString() });
             Swal.fire('Atualizado', `Cliente já existia. Saldo unificado.`, 'info');
         } else {
-            const dados = { cliente: nome, zap: zap, valorRestante: valor, saldoCredito: 0, dataCompra: new Date().toISOString(), ultimaAtualizacao: new Date().toISOString() };
-            if(isDemo) mockAddData('fiados', dados);
-            else await getUserRef("fiados").add(dados);
+            await getUserRef("fiados").add({ cliente: nome, zap: zap, valorRestante: valor, saldoCredito: 0, dataCompra: new Date().toISOString(), ultimaAtualizacao: new Date().toISOString() });
             Swal.fire('Sucesso', 'Cliente cadastrado!', 'success');
         }
         setLoading(btn, false); bootstrap.Modal.getInstance(document.getElementById('modalNovoFiado')).hide();
@@ -754,102 +732,332 @@
         const valPago = parseFloat(document.getElementById('fiado-valor-pagar').value); 
         if(!valPago || valPago <= 0) return; 
         setLoading(btn, true); 
-        const f = fiados.find(x => x.id === id); 
+        
+        let f;
+        if(isDemoMode) { f = fiados.find(x=>x.id===id); } 
+        else { const doc = await getUserRef("fiados").doc(id).get(); f = doc.data(); }
+
         const novaDivida = Math.max(0, f.valorRestante - valPago);
         let novoCredito = f.saldoCredito || 0;
         if (valPago > f.valorRestante) { const troco = valPago - f.valorRestante; if(confirm(`Valor pago excede a dívida em ${formatCurrency(troco)}. Adicionar como crédito para ${f.cliente}?`)) novoCredito += troco; }
         
-        if(isDemo) {
-            mockUpdate('fiados', id, {valorRestante: novaDivida, saldoCredito: novoCredito});
-            mockAddData('financas', { tipo: 'entrada', desc: `Recebimento Fiado - ${f.cliente}`, metodo: 'Dinheiro', valor: valPago, dataISO: new Date().toISOString()});
-            mockAddData('historico', { tipo: 'Recebimento', desc: `Pgto. Dívida ${f.cliente}`, valor: valPago, data: new Date().toISOString() });
-        } else {
-            const batch = db.batch();
-            batch.update(getUserRef("fiados").doc(id), { valorRestante: novaDivida, saldoCredito: novoCredito, ultimaAtualizacao: new Date().toISOString() }); 
-            batch.set(getUserRef("financas").doc(), { tipo: 'entrada', desc: `Recebimento Fiado - ${f.cliente}`, metodo: 'Dinheiro', valor: valPago, dataISO: new Date().toISOString()});
-            batch.set(getUserRef("historico").doc(), { tipo: 'Recebimento', desc: `Pgto. Dívida ${f.cliente}`, valor: valPago, data: new Date().toISOString() });
-            await batch.commit();
-        }
+        const batch = isDemoMode ? MockDB : db.batch();
+        batch.update(getUserRef("fiados").doc(id), { valorRestante: novaDivida, saldoCredito: novoCredito, ultimaAtualizacao: new Date().toISOString() }); 
+        batch.set(getUserRef("financas").doc(), { tipo: 'entrada', desc: `Recebimento Fiado - ${f.cliente}`, metodo: 'Dinheiro', valor: valPago, dataISO: new Date().toISOString()});
+        batch.set(getUserRef("historico").doc(), { tipo: 'Recebimento', desc: `Pgto. Dívida ${f.cliente}`, valor: valPago, data: new Date().toISOString() });
+        
+        if(!isDemoMode) await batch.commit();
         setLoading(btn, false); bootstrap.Modal.getInstance(document.getElementById('modalPagarFiado')).hide(); Swal.fire('Sucesso', 'Valor recebido!', 'success'); 
     }
 
-    // ORDEM DE SERVIÇO EM TABELA (v29.0)
+    // RELATÓRIOS
+    function renderRelatorios() {
+        let rec=0, desp=0; financas.forEach(f => f.tipo==='entrada'?rec+=f.valor:desp+=f.valor);
+        document.getElementById('rel-receita').innerText = formatCurrency(rec);
+        document.getElementById('rel-despesa').innerText = formatCurrency(desp);
+        document.getElementById('rel-lucro').innerText = formatCurrency(rec-desp);
+        document.getElementById('rel-margem').innerText = rec>0 ? ((rec-desp)/rec*100).toFixed(0)+'%' : '0%';
+        document.getElementById('rel-detalhes').innerHTML = financas.slice(0,20).map(f => `<tr><td>${formatDate(f.dataISO)}</td><td>${esc(f.desc)}</td><td><span class="badge ${f.tipo==='entrada'?'bg-success':'bg-danger'}">${f.tipo}</span></td><td class="text-end">${formatCurrency(f.valor)}</td></tr>`).join('');
+        if(chartFin) chartFin.destroy(); if(chartMet) chartMet.destroy();
+        const fluxoData = {}; financas.forEach(f => { const dia = formatDate(f.dataISO); if(!fluxoData[dia]) fluxoData[dia] = 0; fluxoData[dia] += (f.tipo==='entrada'?f.valor:-f.valor); });
+        chartFin = new Chart(document.getElementById('graficoFinanceiro'), { type: 'line', data: { labels: Object.keys(fluxoData).slice(-7), datasets: [{ label: 'Saldo', data: Object.values(fluxoData).slice(-7), borderColor: '#4f46e5', tension: 0.3, fill: true, backgroundColor: 'rgba(79, 70, 229, 0.1)' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display: false} } } });
+        const metodosData = {}; financas.filter(f=>f.tipo==='entrada').forEach(f => { const m = f.metodo || 'Outros'; if(!metodosData[m]) metodosData[m]=0; metodosData[m]+=f.valor; });
+        chartMet = new Chart(document.getElementById('graficoMetodos'), { type: 'doughnut', data: { labels: Object.keys(metodosData), datasets: [{ data: Object.values(metodosData), backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {position: 'bottom'} } } });
+    }
+
+    // IA INTERATIVA
+    function setupVoiceRecognition() {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false; recognition.lang = 'pt-BR'; recognition.interimResults = false;
+            recognition.onstart = function() { document.getElementById('btn-mic').classList.add('mic-listening'); };
+            recognition.onend = function() { document.getElementById('btn-mic').classList.remove('mic-listening'); };
+            recognition.onresult = function(event) { document.getElementById('chat-input').value = event.results[0][0].transcript; enviarMsgIA(); };
+        } else { document.getElementById('btn-mic').style.display = 'none'; }
+    }
+    function toggleMic() { if(recognition) recognition.start(); }
+    function setIAMode(mode) { iaMode = mode; document.getElementById('chat-output').innerHTML = ''; if(mode === 'comando') appendMsg('bot', '<b>IA Interativa</b>:<br>Fale "Vendi cabo p2". Se não existir, eu pergunto se quer criar.'); }
+
+    async function processarComandoNativo(msg) {
+        const m = norm(msg);
+        const batch = isDemoMode ? MockDB : db.batch();
+
+        if (iaContext && iaContext.state === 'waiting_confirmation') {
+            if (m.includes('sim') || m.includes('pode') || m.includes('quero')) { iaContext.state = 'waiting_details'; return `Ok! Digite a <b>QTD, CUSTO e VENDA</b> separados por espaço.<br>Exemplo: <i>10 5.00 15.00</i>`; } 
+            else { iaContext = null; return "Cancelado."; }
+        }
+
+        if (iaContext && iaContext.state === 'waiting_details') {
+            const details = m.match(/(\d+)\s+(\d+[.,]?\d*)\s+(\d+[.,]?\d*)/);
+            if (details) {
+                const qtdInformada = parseInt(details[1]); 
+                const custo = parseFloat(details[2].replace(',', '.')); 
+                const venda = parseFloat(details[3].replace(',', '.')); 
+                const nomeProd = iaContext.productName;
+                const newProdRef = getUserRef("produtos").doc();
+                
+                let qtdFinal = qtdInformada;
+                if (iaContext.action === 'sell') {
+                    const total = venda * iaContext.qty;
+                    qtdFinal = qtdInformada - iaContext.qty;
+                    batch.set(getUserRef("financas").doc(), { tipo: 'entrada', desc: `${iaContext.qty}x ${nomeProd} (Novo)`, metodo: 'Dinheiro', valor: total, dataISO: new Date().toISOString() });
+                    batch.set(getUserRef("historico").doc(), { tipo: 'Venda', desc: `${iaContext.qty}x ${nomeProd}`, valor: total, data: new Date().toISOString() });
+                }
+                
+                batch.set(newProdRef, { nome: nomeProd, qtd: qtdFinal, custo: custo, venda: venda, min: 5 }); 
+                if(!isDemoMode) await batch.commit(); 
+                iaContext = null; 
+                if(isDemoMode) atualizarDashboard(); 
+                return `✅ <b>Produto Criado e Processado!</b><br>${esc(nomeProd)}<br>Estoque Atual: ${qtdFinal}`;
+            } else { return "Formato inválido. Digite: QTD CUSTO VENDA (ex: 10 5.00 15.00)"; }
+        }
+
+        const regexRepor = /(?:adicionar|repor|entrada)\s+(\d+)\s+(?:unidades? de|garrafas? de|no estoque de)?\s*(.+)/;
+        const matchRepor = m.match(regexRepor);
+        if(matchRepor && matchRepor[2]) {
+            const qtd = parseInt(matchRepor[1]); const termo = matchRepor[2].trim(); const produto = produtos.find(p => norm(p.nome).includes(termo));
+            if(produto) { batch.update(getUserRef("produtos").doc(produto.id), {qtd: produto.qtd + qtd}); if(!isDemoMode) await batch.commit(); return `✅ <b>Estoque Atualizado!</b><br>+${qtd} em "${esc(produto.nome)}". Total: ${produto.qtd + qtd}.`; }
+        }
+
+        const regexVenda = /(?:vendi|saiu|venda|saíram|vendas|saida)\s*(\d+)\s*(?:unidades? de|garrafas? de)?\s*(.+)/;
+        const matchVenda = m.match(regexVenda);
+        if (matchVenda && matchVenda[2]) {
+            const qtd = parseInt(matchVenda[1]); const termo = matchVenda[2].trim().replace(/\s+(por|no|na|dinheiro|pix)$/, ''); const produto = produtos.find(p => norm(p.nome).includes(termo));
+            if (produto) {
+                const total = produto.venda * qtd;
+                batch.update(getUserRef("produtos").doc(produto.id), {qtd: produto.qtd - qtd});
+                batch.set(getUserRef("financas").doc(), {tipo: 'entrada', desc: `${qtd}x ${produto.nome} (Voz)`, metodo: 'Dinheiro', valor: total, dataISO: new Date().toISOString()});
+                batch.set(getUserRef("historico").doc(), {tipo: 'Venda', desc: `${qtd}x ${produto.nome}`, valor: total, data: new Date().toISOString()});
+                if(!isDemoMode) await batch.commit(); atualizarDashboard(); return `✅ <b>Venda Confirmada!</b><br>${esc(produto.nome)} x${qtd}`;
+            } else { iaContext = { state: 'waiting_confirmation', productName: termo, qty: qtd, action: 'sell' }; return `⚠️ Produto <b>"${esc(termo)}"</b> não existe.<br>Deseja cadastrar agora? (Responda Sim)`; }
+        }
+        
+        const regexGasto = /(?:saida|gastei|paguei|despesa|gasto|pagamento|retirada)(?:\s+de)?\s+(\d+)\s*(?:reais)?\s*(?:com|em|no|na)?\s*(.*)/;
+        const matchGasto = m.match(regexGasto);
+        if (matchGasto) {
+            const valor = parseFloat(matchGasto[1]); let desc = matchGasto[2].trim().replace(/^(com|em|no|na|produtos|produto)\s+/, ''); if(!desc) desc = "Despesa Diversa";
+            await addData("financas", {tipo:'saida', desc: `Despesa: ${desc}`, metodo:'Dinheiro', valor: valor, dataISO: new Date().toISOString()}, null);
+            await log('Despesa', desc, valor); atualizarDashboard(); return `✅ <b>Despesa Lançada!</b><br>${esc(desc)} - ${formatCurrency(valor)}`;
+        }
+        return null;
+    }
+
+    async function enviarMsgIA() {
+        const inp = document.getElementById('chat-input'); const msg = inp.value; if(!msg) return;
+        appendMsg('user', esc(msg)); inp.value = ''; const loadingId = 'loading-'+Date.now();
+        document.getElementById('chat-output').innerHTML += `<div id="${loadingId}" class="chat-msg chat-bot"><i class="fas fa-circle-notch fa-spin"></i> ...</div>`;
+        if (iaMode === 'comando') { const local = await processarComandoNativo(msg); if(local) { document.getElementById(loadingId).remove(); appendMsg('bot', local); return; } }
+        const apiKey = configEmpresa.apikey; let resposta = "Comando não entendido. Tente 'Vendi X [nome]'.";
+        if(apiKey && apiKey.length > 10) { try { const prompt = `Responda curto: ${msg}`; const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`; const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }); if(res.ok) { const data = await res.json(); resposta = data.candidates[0].content.parts[0].text; } } catch(e) { resposta = "IA indisponível."; } }
+        document.getElementById(loadingId).remove(); appendMsg('bot', marked.parse(resposta));
+    }
+
+    function appendMsg(role, html) { const div = document.createElement('div'); div.className = `chat-msg chat-${role} fade-in`; div.innerHTML = html; const c = document.getElementById('chat-output'); c.appendChild(div); c.scrollTop = c.scrollHeight; }
+
+    // DEMAIS FUNÇÕES
+    const formatCurrency = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);
+    const formatDate = d => new Date(d).toLocaleDateString('pt-BR');
+    function selectPagamento(tipo, elem) { document.getElementById('pag-metodo').value = tipo; document.querySelectorAll('.btn-pagamento').forEach(b => b.classList.remove('active')); elem.classList.add('active'); if(tipo==='Fiado') document.getElementById('cliente-pdv').focus(); }
+    async function log(t,d,v){ await getUserRef("historico").add({tipo:t,desc:d,valor:v,data:new Date().toISOString()}) }
+    async function addData(col,d,btn){ if(btn)setLoading(btn,true); await getUserRef(col).add(d); if(btn){setLoading(btn,false); bootstrap.Modal.getInstance(btn.closest('.modal')).hide(); Swal.fire({toast:true,icon:'success',title:'Salvo',position:'top-end',showConfirmButton:false,timer:1000});} }
+    function del(col,id){ Swal.fire({title:'Excluir?',icon:'warning',showCancelButton:true,confirmButtonColor:'#d33'}).then(r=>{if(r.isConfirmed)getUserRef(col).doc(id).delete()}) }
+    function carregarConfigUI() { document.getElementById('conf-nome').value=configEmpresa.nome||''; document.getElementById('conf-cnpj').value=configEmpresa.cnpj||''; document.getElementById('conf-end').value=configEmpresa.end||''; document.getElementById('conf-msg').value=configEmpresa.msg||''; document.getElementById('conf-apikey').value=configEmpresa.apikey||''; }
+    async function salvarConfig(btn) { setLoading(btn,true); const cfg={ nome:document.getElementById('conf-nome').value, cnpj:document.getElementById('conf-cnpj').value, end:document.getElementById('conf-end').value, msg:document.getElementById('conf-msg').value, apikey:document.getElementById('conf-apikey').value, }; await getConfigRef().set(cfg); setLoading(btn,false); location.reload(); }
+    function navTo(id) { document.querySelectorAll('.section').forEach(el=>el.classList.add('hide')); document.getElementById(id).classList.remove('hide'); toggleMenu(true); if(id==='dashboard') atualizarDashboard(); if(id==='estoque') renderEstoque(false); if(id==='relatorios') renderRelatorios(); }
+    function toggleMenu(force){ const sb=document.getElementById('sidebar'), ov=document.getElementById('overlay'); if(force){sb.classList.remove('show');ov.classList.remove('show')}else{sb.classList.toggle('show');ov.classList.toggle('show')} }
+    
+    async function resetarSistema() {
+        if(isDemoMode) { location.reload(); return; }
+        const { value: confirmacao } = await Swal.fire({
+            title: 'TEM CERTEZA?',
+            text: "Isso apagará TODOS os dados. Digite DELETAR para confirmar.",
+            input: 'text', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Apagar Tudo'
+        });
+
+        if (confirmacao === 'DELETAR') {
+            Swal.fire({title: 'Apagando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
+            const collections = ["produtos", "financas", "historico", "fiados", "os", "contas"];
+            for (const col of collections) {
+                const snapshot = await getUserRef(col).get();
+                const batch = db.batch();
+                snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
+            }
+            Swal.fire('Sistema Resetado', 'Começando do zero.', 'success').then(() => location.reload());
+        }
+    }
+
+    // ESTOQUE
+    function renderEstoque(critico=false){ 
+        const t=document.getElementById('lista-estoque'); 
+        const termo = norm(document.getElementById('busca-estoque').value); 
+        t.innerHTML = produtos.filter(p => { if(critico && p.qtd>(p.min||5)) return false; if(termo && !norm(p.nome).includes(termo)) return false; return true; }).map(p => { 
+            const m = p.venda>0?(((p.venda-p.custo)/p.venda)*100).toFixed(0):0; 
+            return `<tr>
+                <td class="ps-4"><span class="fw-bold">${esc(p.nome)}</span></td>
+                <td><span class="badge ${p.qtd<=(p.min||5)?'bg-danger':'bg-success'}">${p.qtd}</span></td>
+                <td>${formatCurrency(p.custo)}</td>
+                <td>${formatCurrency(p.venda)}</td>
+                <td class="fw-bold ${m<30?'text-danger':'text-success'}">${m}%</td>
+                <td class="text-end pe-4">
+                    <button class="btn btn-sm btn-light text-primary me-1" onclick="abrirModalEditarProduto('${p.id}')"><i class="fas fa-pen"></i></button>
+                    <button class="btn btn-sm btn-light text-danger" onclick="del('produtos','${p.id}')"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>`; 
+        }).join(''); 
+    }
+    
+    function abrirModalProduto(){ 
+        document.getElementById('modal-prod-titulo').innerText = "Novo Produto";
+        document.getElementById('prod-id').value = ''; 
+        document.getElementById('prod-nome').value=''; 
+        document.getElementById('prod-qtd').value='';
+        document.getElementById('prod-min').value='5';
+        document.getElementById('prod-custo').value='';
+        document.getElementById('prod-venda').value='';
+        new bootstrap.Modal(document.getElementById('modalProduto')).show(); 
+    }
+
+    function abrirModalEditarProduto(id) {
+        const p = produtos.find(x => x.id === id);
+        document.getElementById('modal-prod-titulo').innerText = "Editar Produto";
+        document.getElementById('prod-id').value = id;
+        document.getElementById('prod-nome').value = p.nome;
+        document.getElementById('prod-qtd').value = p.qtd;
+        document.getElementById('prod-min').value = p.min || 5;
+        document.getElementById('prod-custo').value = p.custo;
+        document.getElementById('prod-venda').value = p.venda;
+        new bootstrap.Modal(document.getElementById('modalProduto')).show();
+    }
+
+    async function salvarProduto(btn){ 
+        const id = document.getElementById('prod-id').value;
+        const nome=document.getElementById('prod-nome').value; 
+        const qtd=parseInt(document.getElementById('prod-qtd').value)||0;
+        const custo=parseFloat(document.getElementById('prod-custo').value)||0;
+        const venda=parseFloat(document.getElementById('prod-venda').value)||0;
+        const min=parseInt(document.getElementById('prod-min').value)||5;
+        
+        if(!nome)return;
+        setLoading(btn, true);
+        
+        if(id) {
+            await getUserRef("produtos").doc(id).update({nome, qtd, custo, venda, min});
+            Swal.fire({toast:true, icon:'success', title:'Atualizado', position:'top-end', showConfirmButton:false, timer:1000});
+        } else {
+            await getUserRef("produtos").add({nome, qtd, custo, venda, min});
+            Swal.fire({toast:true, icon:'success', title:'Criado', position:'top-end', showConfirmButton:false, timer:1000});
+        }
+        setLoading(btn, false);
+        bootstrap.Modal.getInstance(document.getElementById('modalProduto')).hide();
+    }
+
+    function renderFinancas(){ const t=document.getElementById('lista-financa'); const termo = norm(document.getElementById('busca-financa').value); t.innerHTML = financas.filter(f => !termo || norm(f.desc).includes(termo)).map(f => `<tr><td class="ps-4"><i class="fas ${f.tipo==='entrada'?'fa-arrow-up text-success':'fa-arrow-down text-danger'}"></i></td><td>${esc(f.desc)}</td><td class="fw-bold ${f.tipo==='entrada'?'text-success':'text-danger'}">${formatCurrency(f.valor)}</td><td>${formatDate(f.dataISO)}</td><td class="text-end pe-4"><button class="btn btn-sm btn-light text-danger" onclick="del('financas','${f.id}')"><i class="fas fa-trash"></i></button></td></tr>`).join(''); }
+    
+    // ORDEM DE SERVIÇO ATUALIZADA (TABELA e LOGICA CORRIGIDA)
     function renderOS(){ 
         const c=document.getElementById('lista-os'); 
         c.innerHTML = osList.map(o => { 
-            const statusBadge = o.concluido ? '<span class="badge bg-success">Concluído</span>' : '<span class="badge bg-warning text-dark">Pendente</span>';
-            const actionBtn = o.concluido ? `<button class="btn btn-sm btn-secondary me-1" onclick="imprimirOS('${o.id}')"><i class="fas fa-print"></i></button>` : `<button class="btn btn-sm btn-success me-1" onclick="concluirOS('${o.id}', ${o.valor}, '${esc(o.cliente)}')" title="Concluir"><i class="fas fa-check"></i></button>`;
+            const statusBadge = o.concluido 
+                ? `<span class="badge bg-success">Concluído</span>` 
+                : `<span class="badge bg-warning text-dark">Pendente</span>`;
             
             return `<tr>
                 <td class="ps-4 fw-bold">${esc(o.cliente)}</td>
-                <td>${esc(o.desc)}</td>
+                <td><small class="text-muted">${esc(o.desc).substring(0,30)}...</small></td>
                 <td>${o.prazo ? formatDate(o.prazo) : '-'}</td>
                 <td class="fw-bold text-primary">${o.valor > 0 ? formatCurrency(o.valor) : 'A ORÇAR'}</td>
                 <td>${statusBadge}</td>
                 <td class="text-end pe-4">
-                    ${actionBtn}
+                    ${!o.concluido ? `<button class="btn btn-sm btn-outline-success rounded-pill me-1" onclick="concluirOS('${o.id}', ${o.valor}, '${esc(o.cliente)}')"><i class="fas fa-check"></i></button>` : ''}
                     <button class="btn btn-sm btn-light text-primary me-1" onclick="abrirModalEditarOS('${o.id}')"><i class="fas fa-pen"></i></button>
+                    <button class="btn btn-sm btn-light text-primary me-1" onclick="imprimirOS('${o.id}')"><i class="fas fa-print"></i></button>
                     <button class="btn btn-sm btn-light text-danger" onclick="del('os','${o.id}')"><i class="fas fa-trash"></i></button>
                 </td>
-            </tr>`;
+            </tr>`; 
         }).join(''); 
     }
     
     function abrirModalOS(){ new bootstrap.Modal(document.getElementById('modalOS')).show(); }
     function salvarOS(btn){ const val = parseFloat(document.getElementById('os-valor').value)||0; addData("os",{cliente:document.getElementById('os-cliente').value,desc:document.getElementById('os-desc').value,valor:val,prazo:document.getElementById('os-data').value,dataCriacao:new Date().toISOString(),concluido:false},btn); }
     
-    // CORREÇÃO: CONCLUIR OS ADICIONA NO FINANCEIRO E HISTÓRICO
+    // CORREÇÃO: CONCLUIR OS AGORA LANÇA NO HISTÓRICO
     async function concluirOS(id, valor, cliente) { 
         if(!confirm('Confirmar conclusão?')) return; 
         
-        if(isDemo) {
-            mockUpdate('os', id, {concluido: true});
-            if(valor > 0) {
-                mockAddData('financas', {tipo:'entrada', desc:`Serviço O.S. - ${cliente}`, metodo:'Dinheiro', valor:valor, dataISO:new Date().toISOString()});
-                mockAddData('historico', {tipo:'Serviço', desc:`Conclusão OS - ${cliente}`, valor:valor, data:new Date().toISOString()});
-            }
-        } else {
-            await getUserRef("os").doc(id).update({concluido: true}); 
-            if(valor > 0) {
-                await addData("financas", {tipo:'entrada', desc:`Serviço O.S. - ${cliente}`, metodo:'Dinheiro', valor:valor, dataISO:new Date().toISOString()}, null); 
-                await log("Serviço", `Conclusão OS - ${cliente}`, valor); // Correção Historico
-            }
+        const batch = isDemoMode ? MockDB : db.batch();
+        batch.update(getUserRef("os").doc(id), {concluido: true});
+        
+        if(valor > 0) {
+            batch.set(getUserRef("financas").doc(), {tipo:'entrada', desc:`Serviço O.S. - ${cliente}`, metodo:'Dinheiro', valor:valor, dataISO:new Date().toISOString()});
+            batch.set(getUserRef("historico").doc(), {tipo:'Serviço', desc:`O.S. Concluída - ${cliente}`, valor:valor, data:new Date().toISOString()});
         }
-        Swal.fire('Concluído', 'OS Fechada.', 'success'); 
+        
+        if(!isDemoMode) await batch.commit();
+        if(isDemoMode) { renderOS(); atualizarDashboard(); }
+        Swal.fire('Concluído', 'OS Fechada e Financeiro Atualizado.', 'success'); 
     }
 
     function imprimirOS(id) { const o = osList.find(i => i.id === id); const html = `<div class="folha-os"><div class="os-header"><div><h2 style="margin:0; font-weight:bold;">${esc(configEmpresa.nome)}</h2><p style="margin:0; font-size:12px;">${esc(configEmpresa.end)} | ${esc(configEmpresa.cnpj)}</p></div><div style="text-align:right;"><h3 style="margin:0;">O.S. #${id.substring(0,5).toUpperCase()}</h3><p style="margin:0; font-size:12px;">Data: ${formatDate(o.dataCriacao)}</p></div></div><div class="os-box"><p><strong>Cliente:</strong> ${esc(o.cliente)}</p><p><strong>Prazo Previsto:</strong> ${o.prazo ? formatDate(o.prazo) : 'A combinar'}</p></div><div class="os-box" style="min-height:100px;"><p><strong>Descrição do Defeito / Serviço:</strong></p><p>${esc(o.desc).replace(/\n/g, '<br>')}</p></div><div class="os-box" style="margin-top:20px; text-align:right;"><p style="font-size:14px;">Valor Total</p><h2 style="margin:0;">${o.valor > 0 ? formatCurrency(o.valor) : 'A ORÇAR'}</h2></div><div class="os-box" style="margin-top:20px; border:none; padding:0;"><p style="font-size:10px;">TERMOS: A garantia cobre apenas o serviço realizado. Equipamentos não retirados em 90 dias serão descartados.</p></div><div style="display:flex; justify-content:space-between; margin-top:50px;"><div class="os-assinatura">Assinatura do Técnico</div><div class="os-assinatura">Assinatura do Cliente</div></div></div>`; imprimirConteudo(html); }
     function abrirModalEditarOS(id) { const o = osList.find(i => i.id === id); document.getElementById('edit-os-id').value = id; document.getElementById('edit-os-cliente').value = o.cliente; document.getElementById('edit-os-desc').value = o.desc; document.getElementById('edit-os-valor').value = o.valor; document.getElementById('edit-os-data').value = o.prazo || ''; new bootstrap.Modal(document.getElementById('modalEditarOS')).show(); }
-    async function salvarEdicaoOS(btn) { setLoading(btn, true); const id = document.getElementById('edit-os-id').value; const desc = document.getElementById('edit-os-desc').value; const valor = parseFloat(document.getElementById('edit-os-valor').value) || 0; const prazo = document.getElementById('edit-os-data').value; if(isDemo) mockUpdate('os', id, {desc,valor,prazo}); else await getUserRef("os").doc(id).update({ desc, valor, prazo }); setLoading(btn, false); bootstrap.Modal.getInstance(document.getElementById('modalEditarOS')).hide(); Swal.fire('Atualizado', 'Ordem de Serviço editada.', 'success'); }
+    async function salvarEdicaoOS(btn) { setLoading(btn, true); const id = document.getElementById('edit-os-id').value; const desc = document.getElementById('edit-os-desc').value; const valor = parseFloat(document.getElementById('edit-os-valor').value) || 0; const prazo = document.getElementById('edit-os-data').value; await getUserRef("os").doc(id).update({ desc, valor, prazo }); setLoading(btn, false); bootstrap.Modal.getInstance(document.getElementById('modalEditarOS')).hide(); Swal.fire('Atualizado', 'Ordem de Serviço editada.', 'success'); }
 
-    // GERAL
-    function renderContas() { const t = document.getElementById('lista-contas'); t.innerHTML = contas.map(c => `<tr><td class="ps-4">${c.venc}</td><td>${esc(c.desc)} ${c.recorrente ? '<i class="fas fa-sync-alt text-muted ms-1" title="Mensal"></i>' : ''}</td><td class="fw-bold">${formatCurrency(c.valor)}</td><td><span class="badge bg-warning text-dark">Pendente</span></td><td class="text-end pe-4"><button class="btn btn-sm btn-success rounded-circle" onclick="pagarConta('${c.id}')"><i class="fas fa-check"></i></button> <button class="btn btn-sm btn-light text-danger rounded-circle" onclick="del('contas','${c.id}')"><i class="fas fa-trash"></i></button></td></tr>`).join(''); }
-    function abrirModalConta() { document.getElementById('conta-desc').value = ''; document.getElementById('conta-valor').value = ''; document.getElementById('conta-venc').value = ''; document.getElementById('conta-recorrente').checked = false; new bootstrap.Modal(document.getElementById('modalConta')).show(); }
-    async function salvarConta(btn) { const desc = document.getElementById('conta-desc').value; const valor = parseFloat(document.getElementById('conta-valor').value); const venc = document.getElementById('conta-venc').value; const recorrente = document.getElementById('conta-recorrente').checked; if(!desc || !valor || !venc) return Swal.fire('Erro', 'Preencha todos os campos', 'warning'); addData("contas", {desc, valor, venc, recorrente}, btn); }
+    // CONTAS A PAGAR
+    function renderContas() { 
+        const t = document.getElementById('lista-contas'); 
+        t.innerHTML = contas.map(c => `<tr>
+            <td class="ps-4">${c.venc}</td>
+            <td>${esc(c.desc)} ${c.recorrente ? '<i class="fas fa-sync-alt text-muted ms-1" title="Mensal"></i>' : ''}</td>
+            <td class="fw-bold">${formatCurrency(c.valor)}</td>
+            <td><span class="badge bg-warning text-dark">Pendente</span></td>
+            <td class="text-end pe-4">
+                <button class="btn btn-sm btn-success rounded-circle" onclick="pagarConta('${c.id}')"><i class="fas fa-check"></i></button> 
+                <button class="btn btn-sm btn-light text-danger rounded-circle" onclick="del('contas','${c.id}')"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>`).join(''); 
+    }
+
+    function abrirModalConta() { 
+        document.getElementById('conta-desc').value = '';
+        document.getElementById('conta-valor').value = '';
+        document.getElementById('conta-venc').value = '';
+        document.getElementById('conta-recorrente').checked = false;
+        new bootstrap.Modal(document.getElementById('modalConta')).show(); 
+    }
+
+    async function salvarConta(btn) { 
+        const desc = document.getElementById('conta-desc').value;
+        const valor = parseFloat(document.getElementById('conta-valor').value);
+        const venc = document.getElementById('conta-venc').value;
+        const recorrente = document.getElementById('conta-recorrente').checked;
+        
+        if(!desc || !valor || !venc) return Swal.fire('Erro', 'Preencha todos os campos', 'warning');
+        
+        addData("contas", {desc, valor, venc, recorrente}, btn); 
+    }
+
     async function pagarConta(id) { 
         if(!confirm('Confirmar pagamento?')) return; 
         const c = contas.find(x => x.id === id);
         
-        if(isDemo) mockDelete('contas', id);
-        else await getUserRef("contas").doc(id).delete(); 
-        
+        await getUserRef("contas").doc(id).delete(); 
         const dataISO = new Date().toISOString();
-        if(isDemo) {
-            mockAddData('financas', {tipo:'saida', desc:`Pagamento: ${c.desc}`, metodo:'Dinheiro', valor: c.valor, dataISO});
-            mockAddData('historico', {tipo:'Pagamento', desc:`${c.desc}`, valor: c.valor, data: dataISO});
-        } else {
-            await addData("financas", {tipo:'saida', desc:`Pagamento: ${c.desc}`, metodo:'Dinheiro', valor: c.valor, dataISO}, null);
-            await log('Pagamento', c.desc, c.valor);
-        }
+        await addData("financas", {tipo:'saida', desc:`Pagamento: ${c.desc}`, metodo:'Dinheiro', valor: c.valor, dataISO}, null);
+        await log('Pagamento', c.desc, c.valor);
 
         if(c.recorrente) {
             let nextDate;
-            if(c.venc.includes('-')) { const parts = c.venc.split('-'); nextDate = new Date(parts[0], parts[1]-1, parts[2]); } 
-            else { const parts = c.venc.split('/'); nextDate = new Date(parts[2], parts[1]-1, parts[0]); }
+            if(c.venc.includes('-')) {
+                const parts = c.venc.split('-');
+                nextDate = new Date(parts[0], parts[1]-1, parts[2]); 
+            } else {
+                const parts = c.venc.split('/');
+                nextDate = new Date(parts[2], parts[1]-1, parts[0]);
+            }
             nextDate.setMonth(nextDate.getMonth() + 1);
             const nextVencStr = nextDate.toISOString().split('T')[0];
-            if(isDemo) mockAddData('contas', { desc: c.desc, valor: c.valor, venc: nextVencStr, recorrente: true });
-            else await getUserRef("contas").add({ desc: c.desc, valor: c.valor, venc: nextVencStr, recorrente: true });
+            await getUserRef("contas").add({ desc: c.desc, valor: c.valor, venc: nextVencStr, recorrente: true });
             Swal.fire('Pago', 'Conta baixada e próxima fatura gerada.', 'success');
         } else {
             Swal.fire('Pago', 'Conta baixada e debitada do caixa.', 'success'); 
@@ -861,17 +1069,6 @@
     function exportarDados(tipo) { let dados = tipo === 'produtos' ? produtos : financas; let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; if(tipo === 'produtos') { csvContent += "Nome,Quantidade,Custo,Venda\n"; dados.forEach(d => { csvContent += `"${d.nome}",${d.qtd},${d.custo},${d.venda}\n`; }); } else { csvContent += "Data,Descrição,Tipo,Valor,Método\n"; dados.forEach(d => { csvContent += `"${formatDate(d.dataISO)}","${d.desc}",${d.tipo},${d.valor},"${d.metodo}"\n`; }); } const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", `relatorio_${tipo}.csv`); document.body.appendChild(link); link.click(); }
     function processarImagemOCR(input) { const file = input.files[0]; if(!file) return; document.getElementById('ocr-progress').classList.remove('hide'); const origem = document.getElementById('ocr-origem').value; Tesseract.recognize(file, 'por', { logger: m => console.log(m) }).then(({ data: { text } }) => { document.getElementById('ocr-progress').classList.add('hide'); bootstrap.Modal.getInstance(document.getElementById('modalOCR')).hide(); const valorMatch = text.match(/TOTAL.*?R\$\s?([\d,.]+)/i) || text.match(/VALOR.*?([\d,.]+)/i) || text.match(/R\$\s?([\d,.]+)/i); const dataMatch = text.match(/(\d{2}\/\d{2}\/\d{4})/); const cnpjMatch = text.match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/); let valor = 0; if(valorMatch) valor = parseFloat(valorMatch[1].replace('.','').replace(',','.')); let desc = cnpjMatch ? `Fornecedor CNPJ: ${cnpjMatch[0]}` : "Boleto/Nota (Scanner)"; let data = dataMatch ? dataMatch[0] : new Date().toLocaleDateString('pt-BR'); if(origem === 'contas') { abrirModalConta(); setTimeout(() => { document.getElementById('conta-desc').value = desc; document.getElementById('conta-valor').value = valor; document.getElementById('conta-venc').value = data; Swal.fire({toast:true, icon:'success', title:'Scanner Concluído! Confirme os dados.', position:'top'}); }, 500); } }); }
     function abrirModalOCR(origem) { document.getElementById('ocr-origem').value = origem; document.getElementById('ocr-result').classList.add('hide'); document.getElementById('ocr-file').value = ''; new bootstrap.Modal(document.getElementById('modalOCR')).show(); }
-    
-    async function resetarSistema() {
-        const { value: confirmacao } = await Swal.fire({ title: 'TEM CERTEZA?', text: "Isso apagará TODOS os dados. Digite DELETAR para confirmar.", input: 'text', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Apagar Tudo' });
-        if (confirmacao === 'DELETAR') {
-            if(isDemo) { location.reload(); return; }
-            Swal.fire({title: 'Apagando...', allowOutsideClick: false, didOpen: () => Swal.showLoading()});
-            const collections = ["produtos", "financas", "historico", "fiados", "os", "contas"];
-            for (const col of collections) { const snapshot = await getUserRef(col).get(); const batch = db.batch(); snapshot.docs.forEach(doc => batch.delete(doc.ref)); await batch.commit(); }
-            Swal.fire('Sistema Resetado', 'Começando do zero.', 'success').then(() => location.reload());
-        }
-    }
 
     navTo('dashboard');
 </script>
